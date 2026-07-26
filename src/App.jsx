@@ -42,7 +42,7 @@ function WameedLogo({ size = 32 }) {
       <path d="M30 2 L36 22 L56 22 L40 35 L46 55 L30 43 L14 55 L20 35 L4 22 L24 22 Z" fill="url(#lg)" />
     </svg>
   )
-}
+} 
 
 function AppRoutes() {
   const { user, profile, loading } = useAuth()
