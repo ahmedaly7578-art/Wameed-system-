@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { COLORS } from './components/ui'
 import { WameedLogo } from './components/ui'
 import LoginPage from './pages/LoginPage'
 import DashboardLayout from './layouts/DashboardLayout'
@@ -30,34 +29,14 @@ function LoadingScreen() {
   )
 }
 
-function WameedLogo({ size = 32 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" className="mx-auto">
-      <defs>
-        <linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#E879A0" />
-          <stop offset="100%" stopColor="#7B6FE0" />
-        </linearGradient>
-      </defs>
-      <path d="M30 2 L36 22 L56 22 L40 35 L46 55 L30 43 L14 55 L20 35 L4 22 L24 22 Z" fill="url(#lg)" />
-    </svg>
-  )
-} 
-
 function AppRoutes() {
   const { user, profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
-
   return (
     <Routes>
       <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/" replace />} />
       <Route path="/portal" element={<ClientPortal />} />
-
-      <Route path="/" element={
-        <ProtectedRoute>
-          <DashboardLayout />
-        </ProtectedRoute>
-      }>
+      <Route path="/" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="clients" element={<Clients />} />
         <Route path="clients/:id" element={<ClientDetail />} />
@@ -71,18 +50,9 @@ function AppRoutes() {
         <Route path="targets" element={<Targets />} />
         <Route path="scorecard" element={<Scorecard />} />
         <Route path="satisfaction" element={<Satisfaction />} />
-        <Route path="payroll" element={
-          <ProtectedRoute adminOnly>
-            <Payroll />
-          </ProtectedRoute>
-        } />
-        <Route path="team" element={
-          <ProtectedRoute adminOnly>
-            <TeamManagement />
-          </ProtectedRoute>
-        } />
+        <Route path="payroll" element={<ProtectedRoute adminOnly><Payroll /></ProtectedRoute>} />
+        <Route path="team" element={<ProtectedRoute adminOnly><TeamManagement /></ProtectedRoute>} />
       </Route>
-
       <Route path="*" element={<NotFound />} />
     </Routes>
   )
