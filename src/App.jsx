@@ -1,11 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-// ─── SUPABASE ─────────────────────────────────────────────────────────────────
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL || "",
-  import.meta.env.VITE_SUPABASE_ANON_KEY || ""
-);
 
 const C={bg:"#070E1F",bgCard:"#0D1526",bgHover:"#111E35",bgModal:"#0A1220",border:"rgba(255,255,255,0.07)",borderH:"rgba(255,255,255,0.14)",text:"#F1F5FF",textS:"rgba(255,255,255,0.5)",textM:"rgba(255,255,255,0.25)",pink:"#E879A0",purple:"#7B6FE0",green:"#34D399",blue:"#60A5FA",orange:"#F59E0B",red:"#F87171",teal:"#2DD4BF",grad:"linear-gradient(135deg,#E879A0 0%,#7B6FE0 100%)"};
 const RC={admin:C.pink,media_buyer:C.purple,social_media:C.green,account_manager:C.blue};
@@ -1231,7 +1224,16 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
                         <td style={{padding:"12px 14px"}}><span style={{color:d<=7?C.red:d<=14?C.orange:C.textS,fontSize:12,fontWeight:600}}>{d>0?`${d} يوم`:"انتهى"}</span></td>
                         <td style={{padding:"12px 14px"}}>{c.email?<Bdg label="✓ مفعّلة" color={C.green}/>:<span style={{color:C.textM,fontSize:11}}>—</span>}</td>
                         <td style={{padding:"12px 14px"}}>
-                          <button onClick={()=>setSel(c)} style={{padding:"5px 12px",borderRadius:8,background:`${C.purple}18`,border:`1px solid ${C.purple}33`,color:C.purple,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>عرض</button>
+                          <div style={{display:"flex",gap:6}}>
+                            <button onClick={()=>setSel(c)} style={{padding:"5px 12px",borderRadius:8,background:`${C.purple}18`,border:`1px solid ${C.purple}33`,color:C.purple,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>عرض</button>
+                            <button onClick={()=>{
+                              const next=["active","hold","cancelled"];
+                              const cur=next.indexOf(c.status);
+                              const newStatus=next[(cur+1)%3];
+                              setClients(p=>p.map(x=>x.id===c.id?{...x,status:newStatus}:x));
+                            }} style={{padding:"5px 10px",borderRadius:8,background:`${C.orange}18`,border:`1px solid ${C.orange}33`,color:C.orange,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}} title="تغيير الحالة">⟳</button>
+                            <button onClick={()=>{if(window.confirm(`هل تريد حذف "${c.name}"؟`))setClients(p=>p.filter(x=>x.id!==c.id));}} style={{padding:"5px 10px",borderRadius:8,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -2347,51 +2349,42 @@ function Login({onLogin,users}){
 // ═══ APP ══════════════════════════════════════════════════════════════════════
 export default function App(){
   const [user,setUser]=useState(null);const [page,setPage]=useState("dashboard");
-  const [users,setUsers]=useState(IU);const [clients,setClients]=useState(IC);
-  const [followups,setFollowups]=useState(IFU);const [campaigns,setCampaigns]=useState(ICAM);
-  const [tasks,setTasks]=useState(ITasks);const [notifs,setNotifs]=useState(INF);
-  const [targets,setTargets]=useState(ITARGETS);const [satisfaction,setSatisfaction]=useState(ISAT);
-  const [notes,setNotes]=useState(INOTES);const [payroll,setPayroll]=useState([]);
-  const [dbReady,setDbReady]=useState(false);
+  const setUsers=(fn)=>{setUsersState(prev=>{const next=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("wameed_users",JSON.stringify(next));}catch(e){}return next;});};
+  const [users,setUsersState]=useState(()=>{try{const s=localStorage.getItem("wameed_users");return s?JSON.parse(s):IU;}catch(e){return IU;}});
+  const [clients,setClientsState]=useState(()=>{try{const s=localStorage.getItem("wameed_clients");return s?JSON.parse(s):IC;}catch(e){return IC;}});
+  const [followups,setFollowupsState]=useState(()=>{try{const s=localStorage.getItem("wameed_followups");return s?JSON.parse(s):IFU;}catch(e){return IFU;}});
+  const [campaigns,setCampaignsState]=useState(()=>{try{const s=localStorage.getItem("wameed_campaigns");return s?JSON.parse(s):ICAM;}catch(e){return ICAM;}});
+  const [tasks,setTasksState]=useState(()=>{try{const s=localStorage.getItem("wameed_tasks");return s?JSON.parse(s):ITasks;}catch(e){return ITasks;}});
+  const [notifs,setNotifs]=useState(INF);
+  const [payroll,setPayrollState]=useState(()=>{try{const s=localStorage.getItem("wameed_payroll");return s?JSON.parse(s):[];}catch(e){return [];}});
 
-  // ─── LOAD FROM SUPABASE ───────────────────────────────────────────────────
-  const loadFromDB=async()=>{
-    try{
-      const [{data:dU},{data:dC},{data:dF},{data:dCa},{data:dT},{data:dTg},{data:dS},{data:dN},{data:dP}]=await Promise.all([
-        supabase.from("users").select("*"),
-        supabase.from("clients").select("*"),
-        supabase.from("follow_ups").select("*").order("created_at",{ascending:false}),
-        supabase.from("campaigns").select("*").order("week_start",{ascending:false}),
-        supabase.from("tasks").select("*"),
-        supabase.from("targets").select("*"),
-        supabase.from("satisfaction").select("*"),
-        supabase.from("client_notes").select("*"),
-        supabase.from("payroll").select("*"),
-      ]);
-      if(dU?.length) setUsers(dU.map(u=>({...u,avatar:u.avatar||ini(u.name)})));
-      if(dC?.length) setClients(dC.map(c=>({...c,mb:c.mb_id,sm:c.sm_id,am:c.am_id,pkg:c.pkg_amount,start:c.start_date,end:c.end_date,spend:c.total_spend})));
-      if(dF?.length) setFollowups(dF.map(f=>({...f,clientId:f.client_id,userId:f.user_id,images:f.images||[]})));
-      if(dCa?.length) setCampaigns(dCa.map(c=>({...c,clientId:c.client_id,week:c.week_start,purchaseValue:c.purchase_value})));
-      if(dT?.length) setTasks(dT.map(t=>({...t,assignedTo:t.assigned_to,clientId:t.client_id,due:t.due_date})));
-      if(dTg?.length) setTargets(dTg.map(t=>({...t,userId:t.user_id,targetClients:t.target_clients,targetRoas:t.target_roas,targetUpsell:t.target_upsell,targetRenewal:t.target_renewal})));
-      if(dS?.length) setSatisfaction(dS.map(s=>({...s,clientId:s.client_id,score:s.score_overall,roas:s.score_roas,speed:s.score_speed,reports:s.score_reports})));
-      if(dN?.length) setNotes(dN.map(n=>({...n,clientId:n.client_id,userId:n.user_id})));
-      if(dP?.length) setPayroll(dP.map(p=>({...p,userId:p.user_id,base:p.base_salary})));
-      setDbReady(true);
-    }catch(e){console.log("DB offline, using demo data");setDbReady(false);}
+  // ─── PERSISTENT SETTERS ───────────────────────────────────────────────────
+  const setClients=(fn)=>{setClientsState(prev=>{const next=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("wameed_clients",JSON.stringify(next));}catch(e){}return next;});};
+  const setFollowups=(fn)=>{setFollowupsState(prev=>{const next=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("wameed_followups",JSON.stringify(next));}catch(e){}return next;});};
+  const setCampaigns=(fn)=>{setCampaignsState(prev=>{const next=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("wameed_campaigns",JSON.stringify(next));}catch(e){}return next;});};
+  const setTasks=(fn)=>{setTasksState(prev=>{const next=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("wameed_tasks",JSON.stringify(next));}catch(e){}return next;});};
+  const setPayroll=(fn)=>{setPayrollState(prev=>{const next=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("wameed_payroll",JSON.stringify(next));}catch(e){}return next;});};
+  const [targets,setTargets]=useState(ITARGETS);
+  const [satisfaction,setSatisfactionState]=useState(()=>{
+    try{const s=localStorage.getItem("wameed_satisfaction");return s?JSON.parse(s):ISAT;}catch(e){return ISAT;}
+  });
+  const setSatisfaction=(fn)=>{
+    setSatisfactionState(prev=>{
+      const next=typeof fn==="function"?fn(prev):fn;
+      try{localStorage.setItem("wameed_satisfaction",JSON.stringify(next));}catch(e){}
+      return next;
+    });
   };
+  const [notes,setNotes]=useState(INOTES);const [payroll,setPayroll]=useState([]);
 
-  // ─── SAVE HELPERS ─────────────────────────────────────────────────────────
-  const dbSave=async(table,row)=>{if(!dbReady)return;try{await supabase.from(table).insert(row);}catch(e){}};
-  const dbUpdate=async(table,row,match)=>{if(!dbReady)return;try{await supabase.from(table).update(row).match(match);}catch(e){}};
+  // expose clients for login check
+  useEffect(()=>{ window.__wameedClients = clients; },[clients]);
 
-  useEffect(()=>{window.__wameedClients=clients;},[clients]);
   const addNotif=(n)=>setNotifs(p=>[{...n,id:Date.now(),time:"الآن",read:false},...p]);
-
   useEffect(()=>{
     if(!user||user.type==="client")return;
     clients.filter(c=>c.status==="active").forEach(c=>{
-      const last=followups.filter(f=>f.clientId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||""))[0];
+      const last=followups.filter(f=>f.clientId===c.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
       const diff=last?Math.floor((new Date()-new Date(last.date))/86400000):999;
       if(diff>1){
         const already=notifs.find(n=>n.type==="late"&&n.body?.includes(c.name));
@@ -2400,27 +2393,29 @@ export default function App(){
     });
   },[followups]);
 
-  if(!user) return <Login onLogin={u=>{setUser(u);setPage("dashboard");if(u.type!=="client")loadFromDB();}} users={users}/>;
+  // ─── CLIENT PORTAL ─────────────────────────────────────────────────────────
+  if(!user) return <Login onLogin={u=>{setUser(u);setPage("dashboard")}} users={users}/>;
   if(user.type==="client"){
-    const clientData=clients.find(c=>c.id===user.id)||user;
-    return <ClientPortal clientData={clientData} campaigns={campaigns} users={users} onLogout={()=>setUser(null)} satisfaction={satisfaction} setSatisfaction={(fn)=>{const next=typeof fn==="function"?fn(satisfaction):fn;setSatisfaction(next);if(next.length>satisfaction.length){const s=next[next.length-1];dbSave("satisfaction",{client_id:s.clientId,month:s.month,score_overall:s.score,score_roas:s.roas,score_speed:s.speed,score_reports:s.reports,comment:s.comment});}}}/>;
+    const clientData = clients.find(c=>c.id===user.id)||user;
+    return <ClientPortal clientData={clientData} campaigns={campaigns} users={users} onLogout={()=>setUser(null)} satisfaction={satisfaction} setSatisfaction={setSatisfaction}/>;
   }
 
+  // ─── TEAM PORTAL ───────────────────────────────────────────────────────────
   const unread=notifs.filter(n=>(!n.userId||n.userId===user?.id)&&!n.read).length;
   const P={
     dashboard:<Dashboard clients={clients} users={users} notifs={notifs} followups={followups} tasks={tasks} currentUser={user}/>,
-    clients:<Clients clients={clients} setClients={(fn)=>{const next=typeof fn==="function"?fn(clients):fn;if(next.length>clients.length){const cl=next[next.length-1];dbSave("clients",{name:cl.name,email:cl.email,password:cl.password,pkg_amount:cl.pkg,platforms:cl.platforms,status:cl.status,mb_id:cl.mb,sm_id:cl.sm,am_id:cl.am,start_date:cl.start,end_date:cl.end,roas:cl.roas,total_spend:cl.spend,notes:cl.notes});}setClients(next);}} users={users} notes={notes} setNotes={setNotes} satisfaction={satisfaction} campaigns={campaigns}/>,
+    clients:<Clients clients={clients} setClients={setClients} users={users} notes={notes} setNotes={setNotes} satisfaction={satisfaction} campaigns={campaigns}/>,
     capacity:<Capacity clients={clients} users={users}/>,
-    followup:<FollowUp clients={clients} users={users} followups={followups} setFollowups={(fn)=>{const next=typeof fn==="function"?fn(followups):fn;if(next.length>followups.length){const f=next[next.length-1];dbSave("follow_ups",{client_id:f.clientId,user_id:f.userId,date:f.date,text:f.text,images:f.images?.map(i=>i.name)||[]});}setFollowups(next);}} addNotif={addNotif} currentUser={user}/>,
-    campaigns:<Campaigns campaigns={campaigns} setCampaigns={(fn)=>{const next=typeof fn==="function"?fn(campaigns):fn;if(next.length>campaigns.length){const c=next[next.length-1];dbSave("campaigns",{client_id:c.clientId,platform:c.platform,week_start:c.week,spend:c.spend,clicks:c.clicks,impressions:c.impressions,purchases:c.purchases,purchase_value:c.purchaseValue,roas:c.roas,ctr:c.ctr,cpm:c.cpm,cpc:c.cpc,checkout:c.checkout,add_to_cart:c.addToCart});}setCampaigns(next);}} clients={clients} users={users} currentUser={user}/>,
+    followup:<FollowUp clients={clients} users={users} followups={followups} setFollowups={setFollowups} addNotif={addNotif} currentUser={user}/>,
+    campaigns:<Campaigns campaigns={campaigns} setCampaigns={setCampaigns} clients={clients} users={users} currentUser={user}/>,
     ai:<AIAnalysis clients={clients} campaigns={campaigns} users={users}/>,
-    tasks:<Tasks tasks={tasks} setTasks={(fn)=>{const next=typeof fn==="function"?fn(tasks):fn;if(next.length>tasks.length){const t=next[next.length-1];dbSave("tasks",{title:t.title,assigned_to:t.assignedTo,client_id:t.clientId,due_date:t.due,priority:t.priority,status:t.status});}else{const changed=next.find((t,i)=>t.status!==tasks[i]?.status);if(changed)dbUpdate("tasks",{status:changed.status},{id:changed.id});}setTasks(next);}} clients={clients} users={users} currentUser={user}/>,
+    tasks:<Tasks tasks={tasks} setTasks={setTasks} clients={clients} users={users} currentUser={user}/>,
     reports:<Reports clients={clients} campaigns={campaigns} users={users}/>,
     churn:<ChurnTracker clients={clients} users={users}/>,
     targets:<Targets clients={clients} campaigns={campaigns} users={users} targets={targets} setTargets={setTargets}/>,
     scorecard:<Scorecard clients={clients} campaigns={campaigns} tasks={tasks} users={users}/>,
-    satisfaction:<Satisfaction clients={clients} satisfaction={satisfaction} setSatisfaction={(fn)=>{const next=typeof fn==="function"?fn(satisfaction):fn;if(next.length>satisfaction.length){const s=next[next.length-1];dbSave("satisfaction",{client_id:s.clientId,month:s.month,score_overall:s.score,comment:s.comment});}setSatisfaction(next);}} users={users}/>,
-    payroll:user.role==="admin"?<Payroll users={users} clients={clients} payroll={payroll} setPayroll={(fn)=>{const next=typeof fn==="function"?fn(payroll):fn;setPayroll(next);next.forEach(p=>{supabase.from("payroll").upsert({user_id:p.userId,month:p.month||"2025-05",base_salary:p.base||0,commission:p.commission||0,bonus:p.bonus||0,deductions:p.deductions||0,note:p.note||""},{onConflict:"user_id,month"}).then(()=>{}).catch(()=>{});});}}/>:<div style={{padding:32,color:C.red}}>غير مصرح</div>,
+    satisfaction:<Satisfaction clients={clients} satisfaction={satisfaction} setSatisfaction={setSatisfaction} users={users}/>,
+    payroll:user.role==="admin"?<Payroll users={users} clients={clients} payroll={payroll} setPayroll={setPayroll}/>:<div style={{padding:32,color:C.red}}>غير مصرح</div>,
     team:user.role==="admin"?<TeamMgmt users={users} setUsers={setUsers}/>:<div style={{padding:32,color:C.red}}>غير مصرح</div>,
   };
   return(
@@ -2428,8 +2423,7 @@ export default function App(){
       <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
       <Sidebar page={page} setPage={setPage} user={user} onLogout={()=>setUser(null)} unread={unread}/>
       <main style={{flex:1,marginRight:230,overflowY:"auto",minHeight:"100vh",paddingBottom:40}}>
-        <div style={{position:"sticky",top:0,zIndex:50,background:`${C.bg}ee`,backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.border}`,padding:"9px 28px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{fontSize:11,fontWeight:600,color:dbReady?C.green:C.orange}}>{dbReady?"● متصل بقاعدة البيانات":"● وضع تجريبي"}</span>
+        <div style={{position:"sticky",top:0,zIndex:50,background:`${C.bg}ee`,backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.border}`,padding:"9px 28px",display:"flex",justifyContent:"flex-end"}}>
           <NotifBell notifs={notifs} setNotifs={setNotifs} userId={user.id}/>
         </div>
         {P[page]||P.dashboard}
