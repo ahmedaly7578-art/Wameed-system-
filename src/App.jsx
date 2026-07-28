@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 
 const C={bg:"#070E1F",bgCard:"#0D1526",bgHover:"#111E35",bgModal:"#0A1220",border:"rgba(255,255,255,0.07)",borderH:"rgba(255,255,255,0.14)",text:"#F1F5FF",textS:"rgba(255,255,255,0.5)",textM:"rgba(255,255,255,0.25)",pink:"#E879A0",purple:"#7B6FE0",green:"#34D399",blue:"#60A5FA",orange:"#F59E0B",red:"#F87171",teal:"#2DD4BF",grad:"linear-gradient(135deg,#E879A0 0%,#7B6FE0 100%)"};
-const RC={admin:C.pink,media_buyer:C.purple,social_media:C.green,account_manager:C.blue};
-const RL={admin:"مدير النظام",media_buyer:"Media Buyer",social_media:"Social Media",account_manager:"Account Manager"};
+const RC={admin:C.pink,media_buyer:C.purple,social_media:C.green,account_manager:C.blue,designer:C.teal};
+const RL={admin:"مدير النظام",media_buyer:"Media Buyer",social_media:"Social Media",account_manager:"Account Manager",designer:"Designer"};
 const SL={active:"نشط",hold:"موقوف",cancelled:"ملغي"};
 const SC={active:C.green,hold:C.orange,cancelled:C.red};
 const PLATS=["Meta","Snapchat","TikTok","Google","YouTube","X"];
@@ -158,6 +158,7 @@ const NAV=[
   {id:"clients",icon:"👥",label:"العملاء"},
   {id:"capacity",icon:"⚡",label:"Capacity"},
   {id:"followup",icon:"📌",label:"المتابعات"},
+  {id:"creative",icon:"🎨",label:"الكريتيف"},
   {id:"campaigns",icon:"📊",label:"الحملات"},
   {id:"ai",icon:"🤖",label:"AI تحليل"},
   {id:"tasks",icon:"✅",label:"المهام"},
@@ -1405,7 +1406,154 @@ function ClientFU({client,users,followups,setFollowups,addNotif,currentUser,onBa
   );
 }
 
-// ═══ CAMPAIGNS ════════════════════════════════════════════════════════════════
+// ═══ CREATIVE ═════════════════════════════════════════════════════════════════
+const FORUMS=["From-Scratch","Template","Edit","Re-use"];
+const CSTATUS={pending:"لسه ماتبدأش",in_progress:"جاري",review:"مراجعة",done:"تم",late:"متأخر"};
+const CSTATUS_C={pending:C.textS,in_progress:C.blue,review:C.orange,done:C.green,late:C.red};
+const dlDate=(taskDate)=>{if(!taskDate)return "";const d=new Date(taskDate);d.setDate(d.getDate()+4);return d.toISOString().split("T")[0];};
+
+function AddCreativeModal({open,onClose,onAdd,onSave,edit,clients,users}){
+  const designers=users.filter(u=>u.role==="designer");
+  const E={agency:"",department:"",strategyLink:"",clientId:"",clientName:"",websiteLink:"",taskDate:todayStr(),notes:"",deadLine:"",designerId:"",designerName:"",forum:"From-Scratch",noOfSizes:"",size:"",status:"pending",uploadFolder:"",uploadDate:"",done:false,directorApproved:false,timeNote:""};
+  const [f,setF]=useState(edit||E);const [err,setErr]=useState("");
+  useEffect(()=>{setF(edit?{...E,...edit}:E)},[edit,open]);
+  const s=(k,v)=>setF(p=>{const n={...p,[k]:v};if(k==="taskDate"&&!edit)n.deadLine=dlDate(v);return n;});
+  const sub=()=>{
+    if(!f.agency.trim()||!f.taskDate){setErr("أكمل الحقول المطلوبة (الأجنسي + تاريخ التاسك)");return;}
+    const payload={...f,deadLine:f.deadLine||dlDate(f.taskDate),clientId:f.clientId?+f.clientId:null,designerId:f.designerId?+f.designerId:null};
+    if(edit)onSave({...payload,id:edit.id});else onAdd({...payload,id:Date.now()});
+    setErr("");onClose();
+  };
+  return(
+    <Mdl open={open} onClose={onClose} title={edit?"✏️ تعديل تاسك كريتيف":"🎨 إضافة تاسك كريتيف"} width={620}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <Inp label="الأجنسي / Agency" value={f.agency} onChange={v=>s("agency",v)} req mb={0} placeholder="Ataa"/>
+        <Inp label="الديبارتمنت" value={f.department} onChange={v=>s("department",v)} mb={0} placeholder="Social"/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Sel label="العميل" value={f.clientId} onChange={v=>{s("clientId",v);const c=clients.find(x=>x.id===+v);if(c)s("clientName",c.name);}} opts={clients.map(c=>({v:c.id,l:c.name}))} ph="اختياري" mb={0}/>
+        <Inp label="اسم العميل (لو مش موجود بالنظام)" value={f.clientName} onChange={v=>s("clientName",v)} mb={0}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Inp label="Strategy Link" value={f.strategyLink} onChange={v=>s("strategyLink",v)} mb={0} placeholder="https://..."/>
+        <Inp label="Website Link" value={f.websiteLink} onChange={v=>s("websiteLink",v)} mb={0} placeholder="https://..."/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Inp label="تاريخ التاسك" value={f.taskDate} onChange={v=>s("taskDate",v)} type="date" req mb={0}/>
+        <div>
+          <Inp label="الديدلاين (تلقائي: +4 أيام)" value={f.deadLine} onChange={v=>s("deadLine",v)} type="date" mb={0}/>
+        </div>
+      </div>
+      <div style={{marginTop:12}}>
+        <label style={{display:"block",fontSize:12,fontWeight:600,color:C.textS,marginBottom:6}}>Notes / Data</label>
+        <textarea value={f.notes} onChange={e=>s("notes",e.target.value)} style={{width:"100%",padding:"10px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,outline:"none",fontFamily:"Cairo",boxSizing:"border-box",resize:"vertical",minHeight:60,direction:"rtl"}}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Sel label="المصمم" value={f.designerId} onChange={v=>{s("designerId",v);const d=designers.find(x=>x.id===+v);if(d)s("designerName",d.name);}} opts={designers.map(d=>({v:d.id,l:d.name}))} ph="اختر مصمم" mb={0}/>
+        <Sel label="Forum" value={f.forum} onChange={v=>s("forum",v)} opts={FORUMS.map(x=>({v:x,l:x}))} mb={0}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Inp label="No of Sizes" value={f.noOfSizes} onChange={v=>s("noOfSizes",v)} mb={0} placeholder="2 Platforms"/>
+        <Inp label="Size" value={f.size} onChange={v=>s("size",v)} mb={0} placeholder="Snap+Insta"/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Sel label="الحالة" value={f.status} onChange={v=>s("status",v)} opts={Object.entries(CSTATUS).map(([v,l])=>({v,l}))} mb={0}/>
+        <Inp label="Upload Folder" value={f.uploadFolder} onChange={v=>s("uploadFolder",v)} mb={0} placeholder="رابط الفولدر"/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Inp label="Upload Date" value={f.uploadDate} onChange={v=>s("uploadDate",v)} type="date" mb={0}/>
+        <Inp label="Time" value={f.timeNote} onChange={v=>s("timeNote",v)} mb={0} placeholder="Same"/>
+      </div>
+      <div style={{display:"flex",gap:20,marginTop:16}}>
+        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}><input type="checkbox" checked={f.done} onChange={e=>s("done",e.target.checked)}/><span style={{color:C.textS,fontSize:12}}>Done</span></label>
+        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}><input type="checkbox" checked={f.directorApproved} onChange={e=>s("directorApproved",e.target.checked)}/><span style={{color:C.textS,fontSize:12}}>Director Approved</span></label>
+      </div>
+      {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginTop:14,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
+      <div style={{display:"flex",gap:10,marginTop:16}}>
+        <Btn onClick={sub} style={{flex:1,padding:13}}>✓ حفظ</Btn>
+        <button onClick={onClose} style={{padding:"12px 20px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:12,color:C.textS,fontSize:14,fontFamily:"Cairo",cursor:"pointer"}}>إلغاء</button>
+      </div>
+    </Mdl>
+  );
+}
+
+function CreativeTasks({tasks,setTasks,clients,users,currentUser}){
+  const [addOpen,setAddOpen]=useState(false);const [edit,setEdit]=useState(null);
+  const [filter,setFilter]=useState("all");const [filterDesigner,setFilterDesigner]=useState("all");
+  const designers=users.filter(u=>u.role==="designer");
+  const isLate=(t)=>!t.done&&t.deadLine&&new Date(t.deadLine)<new Date();
+  const filtered=tasks.filter(t=>{
+    if(filter==="late"&&!isLate(t))return false;
+    if(filter!=="all"&&filter!=="late"&&t.status!==filter)return false;
+    if(filterDesigner!=="all"&&t.designerId!==+filterDesigner)return false;
+    return true;
+  });
+  const lateCount=tasks.filter(isLate).length;
+  return(
+    <div>
+      <AddCreativeModal open={addOpen||!!edit} onClose={()=>{setAddOpen(false);setEdit(null)}}
+        onAdd={t=>setTasks(p=>[...p,t])} onSave={t=>setTasks(p=>p.map(x=>x.id===t.id?{...x,...t}:x))}
+        edit={edit} clients={clients} users={users}/>
+      <TB title="الكريتيف 🎨" sub={`${tasks.length} تاسك · ${lateCount} متأخر · متزامن مع Google Sheet`}>
+        <Btn onClick={()=>setAddOpen(true)}>+ تاسك جديد</Btn>
+      </TB>
+      <div style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
+          <StC label="إجمالي التاسكات" value={tasks.length} icon="🎨" color={C.purple}/>
+          <StC label="جاري" value={tasks.filter(t=>t.status==="in_progress").length} icon="🔄" color={C.blue}/>
+          <StC label="تم" value={tasks.filter(t=>t.done).length} icon="✅" color={C.green}/>
+          <StC label="متأخر (بعد 4 أيام)" value={lateCount} icon="🚨" color={C.red}/>
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+          {["all","pending","in_progress","review","done","late"].map(s=>(
+            <button key={s} onClick={()=>setFilter(s)} style={{padding:"8px 14px",borderRadius:20,fontFamily:"Cairo",fontSize:12,cursor:"pointer",border:"1px solid",background:filter===s?`${C.pink}18`:C.bgCard,color:filter===s?C.pink:C.textS,borderColor:filter===s?`${C.pink}44`:C.border}}>
+              {s==="all"?"الكل":s==="late"?"⚠️ متأخر":CSTATUS[s]}
+            </button>
+          ))}
+          <select value={filterDesigner} onChange={e=>setFilterDesigner(e.target.value)} style={{padding:"8px 14px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none"}}>
+            <option value="all">كل المصممين</option>
+            {designers.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </div>
+        {filtered.length===0
+          ?<Card s={{textAlign:"center",padding:"60px"}}><div style={{fontSize:40,marginBottom:12}}>🎨</div><div style={{color:C.textS,fontSize:14}}>لا توجد تاسكات بهذا الفلتر</div></Card>
+          :filtered.map(t=>{
+            const client=clients.find(c=>c.id===t.clientId);
+            const designer=users.find(u=>u.id===t.designerId);
+            const late=isLate(t);
+            return(<Card key={t.id} s={{marginBottom:10,padding:"14px 16px"}}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+                    <span style={{color:C.text,fontSize:13,fontWeight:700}}>{t.agency}</span>
+                    {t.department&&<Bdg label={t.department} color={C.purple} dot={false}/>}
+                    <Bdg label={CSTATUS[t.status]||t.status} color={CSTATUS_C[t.status]||C.textS}/>
+                    {late&&<Bdg label="متأخر ⚠️" color={C.red}/>}
+                    {t.directorApproved&&<Bdg label="✓ Director" color={C.green} dot={false}/>}
+                  </div>
+                  <div style={{color:C.textS,fontSize:12,marginBottom:6}}>{client?.name||t.clientName||"—"} · {t.forum} {t.noOfSizes?`· ${t.noOfSizes}`:""} {t.size?`· ${t.size}`:""}</div>
+                  <div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
+                    {designer&&<div style={{display:"flex",alignItems:"center",gap:5}}><Av text={designer.avatar} color={RC.designer} size={20}/><span style={{color:C.textS,fontSize:11}}>{designer.name}</span></div>}
+                    <span style={{color:C.textM,fontSize:11}}>🗓 نزل: {fmtDate(t.taskDate)}</span>
+                    <span style={{color:late?C.red:C.textM,fontSize:11,fontWeight:late?700:400}}>⏰ ديدلاين: {fmtDate(t.deadLine)}</span>
+                    {t.strategyLink&&<a href={t.strategyLink} target="_blank" rel="noreferrer" style={{color:C.blue,fontSize:11}}>Strategy ↗</a>}
+                    {t.uploadFolder&&<a href={t.uploadFolder} target="_blank" rel="noreferrer" style={{color:C.green,fontSize:11}}>Upload ↗</a>}
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:6,flexShrink:0}}>
+                  {!t.done&&<button onClick={()=>setTasks(p=>p.map(x=>x.id===t.id?{...x,done:true,status:"done"}:x))} style={{padding:"6px 12px",borderRadius:8,background:`${C.green}18`,border:`1px solid ${C.green}33`,color:C.green,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>✓ تم</button>}
+                  <button onClick={()=>setEdit(t)} style={{padding:"6px 10px",borderRadius:8,background:`${C.purple}18`,border:`1px solid ${C.purple}33`,color:C.purple,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>✏️</button>
+                  <button onClick={()=>{if(window.confirm("حذف التاسك؟"))setTasks(p=>p.filter(x=>x.id!==t.id));}} style={{padding:"6px 10px",borderRadius:8,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>
+                </div>
+              </div>
+            </Card>);
+          })
+        }
+      </div>
+    </div>
+  );
+}
+
 // ═══ CAMPAIGNS ════════════════════════════════════════════════════════════════
 function AddCampaignModal({open,onClose,onAdd,clients,currentUser}){
   const myClients=currentUser?.role==="media_buyer"?clients.filter(c=>c.status==="active"&&c.mb===currentUser.id):clients.filter(c=>c.status==="active");
@@ -1818,7 +1966,7 @@ function TeamMgmt({users,setUsers}){
         <Inp label="الاسم الكامل" value={f.name} onChange={v=>sf("name",v)} req placeholder="أحمد محمد"/>
         <Inp label="البريد الإلكتروني" value={f.email} onChange={v=>sf("email",v)} type="email" req placeholder="ahmed@wameed.sa"/>
         <Inp label="كلمة المرور" value={f.password} onChange={v=>sf("password",v)} req placeholder="••••••••"/>
-        <Sel label="الدور" value={f.role} onChange={v=>sf("role",v)} opts={[{v:"media_buyer",l:"Media Buyer"},{v:"social_media",l:"Social Media"},{v:"account_manager",l:"Account Manager"}]} req/>
+        <Sel label="الدور" value={f.role} onChange={v=>sf("role",v)} opts={[{v:"media_buyer",l:"Media Buyer"},{v:"social_media",l:"Social Media"},{v:"account_manager",l:"Account Manager"},{v:"designer",l:"Designer"}]} req/>
         {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
         <div style={{display:"flex",gap:10}}>
           <Btn onClick={save} style={{flex:1,padding:13,opacity:saving?0.7:1}}>
@@ -1831,7 +1979,7 @@ function TeamMgmt({users,setUsers}){
         <Btn onClick={()=>{setF({name:"",role:"media_buyer",email:"",password:""});setErr("");setEdit(null);setOpen(true)}}>+ إضافة</Btn>
       </TB>
       <div style={{padding:"0 32px"}}>
-        {[["media_buyer","Media Buyers","📊"],["social_media","Social Media","🎨"],["account_manager","Account Managers","📋"]].map(([role,label,icon])=>(
+        {[["media_buyer","Media Buyers","📊"],["social_media","Social Media","📱"],["account_manager","Account Managers","📋"],["designer","Designers","🎨"]].map(([role,label,icon])=>(
           <div key={role} style={{marginBottom:24}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}><span style={{fontSize:16}}>{icon}</span><div style={{color:C.textS,fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</div><Bdg label={`${users.filter(u=>u.role===role).length}`} color={RC[role]}/></div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
@@ -2425,6 +2573,7 @@ export default function App(){
   const [tasks, setTasksRaw] = useState(() => ls.get("w_tasks", ITasks));
   const [payroll, setPayrollRaw] = useState(() => ls.get("w_payroll", []));
   const [satisfaction, setSatisfactionRaw] = useState(() => ls.get("w_satisfaction", ISAT));
+  const [creativeTasks, setCreativeTasksRaw] = useState(() => ls.get("w_creative", []));
   const [targets, setTargets] = useState(ITARGETS);
   const [notes, setNotes] = useState(INOTES);
   const [notifs, setNotifs] = useState(INF);
@@ -2442,6 +2591,7 @@ export default function App(){
   const setTasks = mk("w_tasks", setTasksRaw);
   const setPayroll = mk("w_payroll", setPayrollRaw);
   const setSatisfaction = mk("w_satisfaction", setSatisfactionRaw);
+  const setCreativeTasks = mk("w_creative", setCreativeTasksRaw);
 
   // ─── SUPABASE INIT ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -2459,7 +2609,7 @@ export default function App(){
     try {
       const [
         {data:dU}, {data:dC}, {data:dF}, {data:dCa},
-        {data:dT}, {data:dS}, {data:dP}
+        {data:dT}, {data:dS}, {data:dP}, {data:dCr}
       ] = await Promise.all([
         window.__SB.from("users").select("*"),
         window.__SB.from("clients").select("*"),
@@ -2468,6 +2618,7 @@ export default function App(){
         window.__SB.from("tasks").select("*"),
         window.__SB.from("satisfaction").select("*"),
         window.__SB.from("payroll").select("*"),
+        window.__SB.from("creative_tasks").select("*").order("created_at",{ascending:false}),
       ]);
       if(dU?.length) { const v=dU.map(u=>({...u,avatar:u.avatar||ini(u.name)})); setUsersRaw(v); ls.set("w_users",v); }
       if(dC?.length) { const v=dC.map(c=>({...c,mb:c.mb_id,sm:c.sm_id,am:c.am_id,pkg:c.pkg_amount,start:c.start_date,end:c.end_date,spend:c.total_spend})); setClientsRaw(v); ls.set("w_clients",v); }
@@ -2476,6 +2627,7 @@ export default function App(){
       if(dT?.length) { const v=dT.map(t=>({...t,assignedTo:t.assigned_to,clientId:t.client_id,due:t.due_date})); setTasksRaw(v); ls.set("w_tasks",v); }
       if(dS?.length) { const v=dS.map(s=>({...s,clientId:s.client_id,score:s.score_overall,roas:s.score_roas,speed:s.score_speed,reports:s.score_reports})); setSatisfactionRaw(v); ls.set("w_satisfaction",v); }
       if(dP?.length) { const v=dP.map(p=>({...p,userId:p.user_id,base:p.base_salary})); setPayrollRaw(v); ls.set("w_payroll",v); }
+      if(dCr?.length) { const v=dCr.map(t=>({...t,clientId:t.client_id,clientName:t.client_name,designerId:t.designer_id,designerName:t.designer_name,taskDate:t.task_date,deadLine:t.dead_line,strategyLink:t.strategy_link,websiteLink:t.website_link,noOfSizes:t.no_of_sizes,uploadFolder:t.upload_folder,uploadDate:t.upload_date,directorApproved:t.director_approved,timeNote:t.time_note})); setCreativeTasksRaw(v); ls.set("w_creative",v); }
       setDbReady(true);
     } catch(e) { console.log("DB error:", e); }
   };
@@ -2496,6 +2648,30 @@ export default function App(){
       }
     });
   }, [followups]);
+
+  // late creative-task alerts — deadline = task date + 4 days
+  useEffect(() => {
+    if (!user || user.type === "client") return;
+    creativeTasks.filter(t => !t.done).forEach(t => {
+      if (!t.deadLine || new Date(t.deadLine) >= new Date()) return;
+      if (notifs.find(n => n.type === "creative_late" && n.creativeId === t.id)) return;
+      const designer = users.find(u => u.id === t.designerId);
+      addNotif({
+        type: "creative_late",
+        creativeId: t.id,
+        title: "⚠️ تاسك كريتيف متأخر",
+        body: `${t.agency}${designer ? " — " + designer.name : ""} — تجاوز الديدلاين (${fmtDate(t.deadLine)})`,
+        userId: 1,
+      });
+      if (designer) addNotif({
+        type: "creative_late",
+        creativeId: t.id,
+        title: "⚠️ عندك تاسك متأخر",
+        body: `${t.agency} — كان لازم يتسلم بتاريخ ${fmtDate(t.deadLine)}`,
+        userId: designer.id,
+      });
+    });
+  }, [creativeTasks]);
 
   // ─── ROUTING ──────────────────────────────────────────────────────────────
   if (!user) return <Login onLogin={u => { setUser(u); setPage("dashboard"); }} />;
@@ -2551,6 +2727,34 @@ export default function App(){
         setFollowups(next);
       }}
       addNotif={addNotif} currentUser={user}
+    />,
+    creative: <CreativeTasks
+      tasks={creativeTasks}
+      setTasks={(fn) => {
+        const prev = creativeTasks;
+        const next = typeof fn === "function" ? fn(prev) : fn;
+        const toRow = (t) => ({
+          agency:t.agency, department:t.department, strategy_link:t.strategyLink,
+          client_id:t.clientId||null, client_name:t.clientName, website_link:t.websiteLink,
+          task_date:t.taskDate, notes:t.notes, dead_line:t.deadLine,
+          designer_id:t.designerId||null, designer_name:t.designerName, forum:t.forum,
+          no_of_sizes:t.noOfSizes, size:t.size, status:t.status,
+          upload_folder:t.uploadFolder, upload_date:t.uploadDate||null,
+          done:t.done, director_approved:t.directorApproved, time_note:t.timeNote,
+        });
+        if (next.length > prev.length) {
+          const t = next[next.length-1];
+          save("creative_tasks", toRow(t));
+        } else if (next.length < prev.length) {
+          const removed = prev.find(t => !next.find(x => x.id === t.id));
+          if (removed) del("creative_tasks", {id: removed.id});
+        } else {
+          const changed = next.find((t,i) => JSON.stringify(t) !== JSON.stringify(prev[i]));
+          if (changed) update("creative_tasks", toRow(changed), {id:changed.id});
+        }
+        setCreativeTasks(next);
+      }}
+      clients={clients} users={users} currentUser={user}
     />,
     campaigns: <Campaigns
       campaigns={campaigns}
