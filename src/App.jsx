@@ -2312,26 +2312,26 @@ function Login({onLogin}){
     if(!em||!pw){setErr("أدخل البيانات");setShake(true);setTimeout(()=>setShake(false),600);return;}
     setLoading(true);setErr("");
     try{
-      // 1. Check if client account first
-      const clientUser=window.__wameedClients?.find(c=>c.email===em&&c.password===pw);
-      if(clientUser){onLogin({type:"client",...clientUser});setLoading(false);return;}
+      // 1. Check team members FIRST (local users from localStorage or initial data)
+      const localUsers=JSON.parse(localStorage.getItem("w_users")||JSON.stringify(IU));
+      const teamUser=localUsers.find(u=>u.email===em&&u.password===pw);
+      if(teamUser){onLogin({type:"team",...teamUser});setLoading(false);return;}
 
       // 2. Try Supabase Auth for team members
       if(window.__SB){
-        const {data,error}=await window.__SB.auth.signInWithPassword({email:em,password:pw});
-        if(error)throw error;
-        // Get user profile
-        const {data:profile}=await window.__SB.from("users").select("*").eq("auth_id",data.user.id).single();
-        if(profile){
-          onLogin({type:"team",...profile,avatar:profile.avatar||ini(profile.name)});
-          setLoading(false);return;
-        }
+        try{
+          const {data,error}=await window.__SB.auth.signInWithPassword({email:em,password:pw});
+          if(!error&&data?.user){
+            const {data:profile}=await window.__SB.from("users").select("*").eq("auth_id",data.user.id).single();
+            if(profile){onLogin({type:"team",...profile,avatar:profile.avatar||ini(profile.name)});setLoading(false);return;}
+          }
+        }catch(e){}
       }
 
-      // 3. Fallback: local users (demo mode)
-      const localUsers=JSON.parse(localStorage.getItem("w_users")||"[]");
-      const teamUser=localUsers.find(u=>u.email===em&&u.password===pw);
-      if(teamUser){onLogin({type:"team",...teamUser});setLoading(false);return;}
+      // 3. Check client portal accounts LAST
+      const allClients=JSON.parse(localStorage.getItem("w_clients")||JSON.stringify(IC));
+      const clientUser=allClients.find(c=>c.email===em&&c.password===pw);
+      if(clientUser){onLogin({type:"client",...clientUser});setLoading(false);return;}
 
       throw new Error("not found");
     }catch(e){
