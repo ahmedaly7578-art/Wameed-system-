@@ -1778,14 +1778,39 @@ function Payroll({users,clients,payroll,setPayroll}){
 // ═══ TEAM MANAGEMENT ═════════════════════════════════════════════════════════
 function TeamMgmt({users,setUsers}){
   const [open,setOpen]=useState(false);const [edit,setEdit]=useState(null);
-  const [f,setF]=useState({name:"",role:"media_buyer",email:"",password:""});const [err,setErr]=useState("");
+  const [f,setF]=useState({name:"",role:"media_buyer",email:"",password:""});
+  const [err,setErr]=useState("");const [saving,setSaving]=useState(false);
   const sf=(k,v)=>setF(p=>({...p,[k]:v}));
-  const save=()=>{
+
+  const save=async()=>{
     if(!f.name.trim()||!f.email.trim()||!f.password){setErr("أكمل جميع الحقول");return;}
+    setSaving(true);setErr("");
     const av=ini(f.name);
-    if(edit)setUsers(p=>p.map(u=>u.id===edit.id?{...u,...f,avatar:av}:u));
-    else{if(users.find(u=>u.email===f.email)){setErr("البريد مستخدم");return;}setUsers(p=>[...p,{id:Date.now(),...f,avatar:av}]);}
-    setOpen(false);setErr("");
+    try{
+      if(edit){
+        // Update existing
+        setUsers(p=>p.map(u=>u.id===edit.id?{...u,...f,avatar:av}:u));
+        if(window.__SB) await window.__SB.from("users").update({name:f.name,role:f.role,avatar:av}).eq("id",edit.id);
+      }else{
+        if(users.find(u=>u.email===f.email)){setErr("البريد مستخدم");setSaving(false);return;}
+        // Create Supabase Auth user
+        let authId=null;
+        if(window.__SB){
+          const {data,error}=await window.__SB.auth.admin?.createUser({email:f.email,password:f.password,email_confirm:true}).catch(()=>({data:null,error:"no admin"}));
+          if(data?.user) authId=data.user.id;
+          // If admin API not available, use signup
+          if(!authId){
+            const {data:sd}=await window.__SB.auth.signUp({email:f.email,password:f.password});
+            authId=sd?.user?.id||null;
+          }
+          // Insert into users table
+          await window.__SB.from("users").insert({auth_id:authId,name:f.name,email:f.email,role:f.role,avatar:av});
+        }
+        setUsers(p=>[...p,{id:authId||Date.now(),...f,avatar:av}]);
+      }
+      setOpen(false);setErr("");
+    }catch(e){setErr("حدث خطأ — تحقق من الاتصال");}
+    setSaving(false);
   };
   return(
     <div>
@@ -1795,7 +1820,12 @@ function TeamMgmt({users,setUsers}){
         <Inp label="كلمة المرور" value={f.password} onChange={v=>sf("password",v)} req placeholder="••••••••"/>
         <Sel label="الدور" value={f.role} onChange={v=>sf("role",v)} opts={[{v:"media_buyer",l:"Media Buyer"},{v:"social_media",l:"Social Media"},{v:"account_manager",l:"Account Manager"}]} req/>
         {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
-        <div style={{display:"flex",gap:10}}><Btn onClick={save} style={{flex:1,padding:13}}>{edit?"حفظ":"✓ إضافة"}</Btn><button onClick={()=>setOpen(false)} style={{padding:"12px 20px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:12,color:C.textS,fontSize:14,fontFamily:"Cairo",cursor:"pointer"}}>إلغاء</button></div>
+        <div style={{display:"flex",gap:10}}>
+          <Btn onClick={save} style={{flex:1,padding:13,opacity:saving?0.7:1}}>
+            {saving?<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span style={{width:14,height:14,border:"2px solid rgba(255,255,255,0.3)",borderTopColor:"white",borderRadius:"50%",animation:"spin .7s linear infinite",display:"inline-block"}}/>جاري الحفظ...</span>:edit?"حفظ":"✓ إضافة وإنشاء حساب"}
+          </Btn>
+          <button onClick={()=>setOpen(false)} style={{padding:"12px 20px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:12,color:C.textS,fontSize:14,fontFamily:"Cairo",cursor:"pointer"}}>إلغاء</button>
+        </div>
       </Mdl>
       <TB title="إدارة الفريق 🧑‍💼" sub={`${users.filter(u=>u.role!=="admin").length} موظف`}>
         <Btn onClick={()=>{setF({name:"",role:"media_buyer",email:"",password:""});setErr("");setEdit(null);setOpen(true)}}>+ إضافة</Btn>
@@ -2272,24 +2302,43 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
 }
 
 // ═══ LOGIN ════════════════════════════════════════════════════════════════════
-function Login({onLogin,users}){
+function Login({onLogin}){
   const [em,setEm]=useState("");const [pw,setPw]=useState("");const [show,setShow]=useState(false);
   const [loading,setLoading]=useState(false);const [err,setErr]=useState("");const [foc,setFoc]=useState(null);
   const [shake,setShake]=useState(false);const [mt,setMt]=useState(false);
   useEffect(()=>{setTimeout(()=>setMt(true),80)},[]);
-  const go=()=>{
+
+  const go=async()=>{
     if(!em||!pw){setErr("أدخل البيانات");setShake(true);setTimeout(()=>setShake(false),600);return;}
     setLoading(true);setErr("");
-    setTimeout(()=>{
-      // check team members first
-      const teamUser=users.find(u=>u.email===em&&u.password===pw);
-      if(teamUser){onLogin({type:"team",...teamUser});setLoading(false);return;}
-      // check client accounts (passed as prop)
+    try{
+      // 1. Check if client account first
       const clientUser=window.__wameedClients?.find(c=>c.email===em&&c.password===pw);
       if(clientUser){onLogin({type:"client",...clientUser});setLoading(false);return;}
-      setErr("البريد أو كلمة المرور غير صحيحة");setShake(true);setTimeout(()=>setShake(false),600);
-      setLoading(false);
-    },1100);
+
+      // 2. Try Supabase Auth for team members
+      if(window.__SB){
+        const {data,error}=await window.__SB.auth.signInWithPassword({email:em,password:pw});
+        if(error)throw error;
+        // Get user profile
+        const {data:profile}=await window.__SB.from("users").select("*").eq("auth_id",data.user.id).single();
+        if(profile){
+          onLogin({type:"team",...profile,avatar:profile.avatar||ini(profile.name)});
+          setLoading(false);return;
+        }
+      }
+
+      // 3. Fallback: local users (demo mode)
+      const localUsers=JSON.parse(localStorage.getItem("w_users")||"[]");
+      const teamUser=localUsers.find(u=>u.email===em&&u.password===pw);
+      if(teamUser){onLogin({type:"team",...teamUser});setLoading(false);return;}
+
+      throw new Error("not found");
+    }catch(e){
+      setErr("البريد أو كلمة المرور غير صحيحة");
+      setShake(true);setTimeout(()=>setShake(false),600);
+    }
+    setLoading(false);
   };
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Cairo",direction:"rtl",position:"relative",overflow:"hidden"}}>
@@ -2347,86 +2396,243 @@ function Login({onLogin,users}){
 }
 
 // ═══ APP ══════════════════════════════════════════════════════════════════════
+// Helper: save to Supabase + localStorage fallback
+const SB = typeof window !== "undefined" && window.__SB;
+const save = async (table, data) => {
+  if(window.__SB) try { await window.__SB.from(table).insert(data); } catch(e) {}
+};
+const update = async (table, data, match) => {
+  if(window.__SB) try { await window.__SB.from(table).update(data).match(match); } catch(e) {}
+};
+const del = async (table, match) => {
+  if(window.__SB) try { await window.__SB.from(table).delete().match(match); } catch(e) {}
+};
+const ls = {
+  get: (k, def) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch(e) { return def; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
+};
+
 export default function App(){
-  const [user,setUser]=useState(null);const [page,setPage]=useState("dashboard");
-  const setUsers=(fn)=>{setUsersState(prev=>{const next=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("wameed_users",JSON.stringify(next));}catch(e){}return next;});};
-  const [users,setUsersState]=useState(()=>{try{const s=localStorage.getItem("wameed_users");return s?JSON.parse(s):IU;}catch(e){return IU;}});
-  const [clients,setClientsState]=useState(()=>{try{const s=localStorage.getItem("wameed_clients");return s?JSON.parse(s):IC;}catch(e){return IC;}});
-  const [followups,setFollowupsState]=useState(()=>{try{const s=localStorage.getItem("wameed_followups");return s?JSON.parse(s):IFU;}catch(e){return IFU;}});
-  const [campaigns,setCampaignsState]=useState(()=>{try{const s=localStorage.getItem("wameed_campaigns");return s?JSON.parse(s):ICAM;}catch(e){return ICAM;}});
-  const [tasks,setTasksState]=useState(()=>{try{const s=localStorage.getItem("wameed_tasks");return s?JSON.parse(s):ITasks;}catch(e){return ITasks;}});
-  const [notifs,setNotifs]=useState(INF);
-  const [payroll,setPayrollState]=useState(()=>{try{const s=localStorage.getItem("wameed_payroll");return s?JSON.parse(s):[];}catch(e){return [];}});
+  const [user, setUser] = useState(null);
+  const [page, setPage] = useState("dashboard");
+  const [dbReady, setDbReady] = useState(false);
+
+  // ─── STATE (localStorage as persistence) ──────────────────────────────────
+  const [users, setUsersRaw] = useState(() => ls.get("w_users", IU));
+  const [clients, setClientsRaw] = useState(() => ls.get("w_clients", IC));
+  const [followups, setFollowupsRaw] = useState(() => ls.get("w_followups", IFU));
+  const [campaigns, setCampaignsRaw] = useState(() => ls.get("w_campaigns", ICAM));
+  const [tasks, setTasksRaw] = useState(() => ls.get("w_tasks", ITasks));
+  const [payroll, setPayrollRaw] = useState(() => ls.get("w_payroll", []));
+  const [satisfaction, setSatisfactionRaw] = useState(() => ls.get("w_satisfaction", ISAT));
+  const [targets, setTargets] = useState(ITARGETS);
+  const [notes, setNotes] = useState(INOTES);
+  const [notifs, setNotifs] = useState(INF);
 
   // ─── PERSISTENT SETTERS ───────────────────────────────────────────────────
-  const setClients=(fn)=>{setClientsState(prev=>{const next=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("wameed_clients",JSON.stringify(next));}catch(e){}return next;});};
-  const setFollowups=(fn)=>{setFollowupsState(prev=>{const next=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("wameed_followups",JSON.stringify(next));}catch(e){}return next;});};
-  const setCampaigns=(fn)=>{setCampaignsState(prev=>{const next=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("wameed_campaigns",JSON.stringify(next));}catch(e){}return next;});};
-  const setTasks=(fn)=>{setTasksState(prev=>{const next=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("wameed_tasks",JSON.stringify(next));}catch(e){}return next;});};
-  const setPayroll=(fn)=>{setPayrollState(prev=>{const next=typeof fn==="function"?fn(prev):fn;try{localStorage.setItem("wameed_payroll",JSON.stringify(next));}catch(e){}return next;});};
-  const [targets,setTargets]=useState(ITARGETS);
-  const [satisfaction,setSatisfactionState]=useState(()=>{
-    try{const s=localStorage.getItem("wameed_satisfaction");return s?JSON.parse(s):ISAT;}catch(e){return ISAT;}
+  const mk = (key, setter) => (fn) => setter(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    ls.set(key, next);
+    return next;
   });
-  const setSatisfaction=(fn)=>{
-    setSatisfactionState(prev=>{
-      const next=typeof fn==="function"?fn(prev):fn;
-      try{localStorage.setItem("wameed_satisfaction",JSON.stringify(next));}catch(e){}
-      return next;
-    });
+  const setUsers = mk("w_users", setUsersRaw);
+  const setClients = mk("w_clients", setClientsRaw);
+  const setFollowups = mk("w_followups", setFollowupsRaw);
+  const setCampaigns = mk("w_campaigns", setCampaignsRaw);
+  const setTasks = mk("w_tasks", setTasksRaw);
+  const setPayroll = mk("w_payroll", setPayrollRaw);
+  const setSatisfaction = mk("w_satisfaction", setSatisfactionRaw);
+
+  // ─── SUPABASE INIT ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const url = import.meta?.env?.VITE_SUPABASE_URL;
+    const key = import.meta?.env?.VITE_SUPABASE_ANON_KEY;
+    if (!url || !key) return;
+    import("https://esm.sh/@supabase/supabase-js@2").then(({createClient}) => {
+      window.__SB = createClient(url, key);
+      loadFromDB();
+    }).catch(() => {});
+  }, []);
+
+  const loadFromDB = async () => {
+    if (!window.__SB) return;
+    try {
+      const [
+        {data:dU}, {data:dC}, {data:dF}, {data:dCa},
+        {data:dT}, {data:dS}, {data:dP}
+      ] = await Promise.all([
+        window.__SB.from("users").select("*"),
+        window.__SB.from("clients").select("*"),
+        window.__SB.from("follow_ups").select("*").order("created_at",{ascending:false}),
+        window.__SB.from("campaigns").select("*").order("week_start",{ascending:false}),
+        window.__SB.from("tasks").select("*"),
+        window.__SB.from("satisfaction").select("*"),
+        window.__SB.from("payroll").select("*"),
+      ]);
+      if(dU?.length) { const v=dU.map(u=>({...u,avatar:u.avatar||ini(u.name)})); setUsersRaw(v); ls.set("w_users",v); }
+      if(dC?.length) { const v=dC.map(c=>({...c,mb:c.mb_id,sm:c.sm_id,am:c.am_id,pkg:c.pkg_amount,start:c.start_date,end:c.end_date,spend:c.total_spend})); setClientsRaw(v); ls.set("w_clients",v); }
+      if(dF?.length) { const v=dF.map(f=>({...f,clientId:f.client_id,userId:f.user_id,images:f.images||[]})); setFollowupsRaw(v); ls.set("w_followups",v); }
+      if(dCa?.length) { const v=dCa.map(c=>({...c,clientId:c.client_id,week:c.week_start,purchaseValue:c.purchase_value})); setCampaignsRaw(v); ls.set("w_campaigns",v); }
+      if(dT?.length) { const v=dT.map(t=>({...t,assignedTo:t.assigned_to,clientId:t.client_id,due:t.due_date})); setTasksRaw(v); ls.set("w_tasks",v); }
+      if(dS?.length) { const v=dS.map(s=>({...s,clientId:s.client_id,score:s.score_overall,roas:s.score_roas,speed:s.score_speed,reports:s.score_reports})); setSatisfactionRaw(v); ls.set("w_satisfaction",v); }
+      if(dP?.length) { const v=dP.map(p=>({...p,userId:p.user_id,base:p.base_salary})); setPayrollRaw(v); ls.set("w_payroll",v); }
+      setDbReady(true);
+    } catch(e) { console.log("DB error:", e); }
   };
-  const [notes,setNotes]=useState(INOTES);const [payroll,setPayroll]=useState([]);
 
-  // expose clients for login check
-  useEffect(()=>{ window.__wameedClients = clients; },[clients]);
+  // expose clients for client login
+  useEffect(() => { window.__wameedClients = clients; }, [clients]);
 
-  const addNotif=(n)=>setNotifs(p=>[{...n,id:Date.now(),time:"الآن",read:false},...p]);
-  useEffect(()=>{
-    if(!user||user.type==="client")return;
-    clients.filter(c=>c.status==="active").forEach(c=>{
-      const last=followups.filter(f=>f.clientId===c.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
-      const diff=last?Math.floor((new Date()-new Date(last.date))/86400000):999;
-      if(diff>1){
-        const already=notifs.find(n=>n.type==="late"&&n.body?.includes(c.name));
-        if(!already)addNotif({type:"late",title:"⚠️ تأخر فولو أب",body:`${c.name} — لم يُضَف فولو أب منذ ${diff===999?"البداية":`${diff} أيام`}`,userId:1});
+  const addNotif = (n) => setNotifs(p => [{...n, id:Date.now(), time:"الآن", read:false}, ...p]);
+
+  // late followup alerts
+  useEffect(() => {
+    if (!user || user.type === "client") return;
+    clients.filter(c => c.status === "active").forEach(c => {
+      const last = followups.filter(f => f.clientId === c.id).sort((a,b) => (b.date||"").localeCompare(a.date||""))[0];
+      const diff = last ? Math.floor((new Date() - new Date(last.date)) / 86400000) : 999;
+      if (diff > 1 && !notifs.find(n => n.type === "late" && n.body?.includes(c.name))) {
+        addNotif({type:"late", title:"⚠️ تأخر فولو أب", body:`${c.name} — لم يُضَف فولو أب منذ ${diff===999?"البداية":`${diff} أيام`}`, userId:1});
       }
     });
-  },[followups]);
+  }, [followups]);
 
-  // ─── CLIENT PORTAL ─────────────────────────────────────────────────────────
-  if(!user) return <Login onLogin={u=>{setUser(u);setPage("dashboard")}} users={users}/>;
-  if(user.type==="client"){
-    const clientData = clients.find(c=>c.id===user.id)||user;
-    return <ClientPortal clientData={clientData} campaigns={campaigns} users={users} onLogout={()=>setUser(null)} satisfaction={satisfaction} setSatisfaction={setSatisfaction}/>;
+  // ─── ROUTING ──────────────────────────────────────────────────────────────
+  if (!user) return <Login onLogin={u => { setUser(u); setPage("dashboard"); }} />;
+
+  if (user.type === "client") {
+    const clientData = clients.find(c => c.id === user.id) || user;
+    return <ClientPortal
+      clientData={clientData}
+      campaigns={campaigns}
+      users={users}
+      onLogout={() => setUser(null)}
+      satisfaction={satisfaction}
+      setSatisfaction={(fn) => {
+        const next = typeof fn === "function" ? fn(satisfaction) : fn;
+        setSatisfaction(next);
+        if (next.length > satisfaction.length) {
+          const s = next[next.length-1];
+          save("satisfaction", {client_id:s.clientId, month:s.month, score_overall:s.score, score_roas:s.roas, score_speed:s.speed, score_reports:s.reports, comment:s.comment});
+        }
+      }}
+    />;
   }
 
-  // ─── TEAM PORTAL ───────────────────────────────────────────────────────────
-  const unread=notifs.filter(n=>(!n.userId||n.userId===user?.id)&&!n.read).length;
-  const P={
-    dashboard:<Dashboard clients={clients} users={users} notifs={notifs} followups={followups} tasks={tasks} currentUser={user}/>,
-    clients:<Clients clients={clients} setClients={setClients} users={users} notes={notes} setNotes={setNotes} satisfaction={satisfaction} campaigns={campaigns}/>,
-    capacity:<Capacity clients={clients} users={users}/>,
-    followup:<FollowUp clients={clients} users={users} followups={followups} setFollowups={setFollowups} addNotif={addNotif} currentUser={user}/>,
-    campaigns:<Campaigns campaigns={campaigns} setCampaigns={setCampaigns} clients={clients} users={users} currentUser={user}/>,
-    ai:<AIAnalysis clients={clients} campaigns={campaigns} users={users}/>,
-    tasks:<Tasks tasks={tasks} setTasks={setTasks} clients={clients} users={users} currentUser={user}/>,
-    reports:<Reports clients={clients} campaigns={campaigns} users={users}/>,
-    churn:<ChurnTracker clients={clients} users={users}/>,
-    targets:<Targets clients={clients} campaigns={campaigns} users={users} targets={targets} setTargets={setTargets}/>,
-    scorecard:<Scorecard clients={clients} campaigns={campaigns} tasks={tasks} users={users}/>,
-    satisfaction:<Satisfaction clients={clients} satisfaction={satisfaction} setSatisfaction={setSatisfaction} users={users}/>,
-    payroll:user.role==="admin"?<Payroll users={users} clients={clients} payroll={payroll} setPayroll={setPayroll}/>:<div style={{padding:32,color:C.red}}>غير مصرح</div>,
-    team:user.role==="admin"?<TeamMgmt users={users} setUsers={setUsers}/>:<div style={{padding:32,color:C.red}}>غير مصرح</div>,
+  const unread = notifs.filter(n => (!n.userId || n.userId === user?.id) && !n.read).length;
+  const P = {
+    dashboard: <Dashboard clients={clients} users={users} notifs={notifs} followups={followups} tasks={tasks} currentUser={user}/>,
+    clients: <Clients
+      clients={clients}
+      setClients={(fn) => {
+        const prev = clients;
+        const next = typeof fn === "function" ? fn(prev) : fn;
+        if (next.length > prev.length) {
+          const cl = next[next.length-1];
+          save("clients", {name:cl.name,email:cl.email,password:cl.password,pkg_amount:cl.pkg,platforms:cl.platforms,status:cl.status,mb_id:cl.mb,sm_id:cl.sm,am_id:cl.am,start_date:cl.start,end_date:cl.end,roas:cl.roas,total_spend:cl.spend,notes:cl.notes});
+        } else if (next.length < prev.length) {
+          const removed = prev.find(c => !next.find(x => x.id === c.id));
+          if (removed) del("clients", {id: removed.id});
+        }
+        setClients(next);
+      }}
+      users={users} notes={notes} setNotes={setNotes} satisfaction={satisfaction} campaigns={campaigns}
+    />,
+    capacity: <Capacity clients={clients} users={users}/>,
+    followup: <FollowUp
+      clients={clients} users={users} followups={followups}
+      setFollowups={(fn) => {
+        const prev = followups;
+        const next = typeof fn === "function" ? fn(prev) : fn;
+        if (next.length > prev.length) {
+          const f = next[next.length-1];
+          save("follow_ups", {client_id:f.clientId, user_id:f.userId, date:f.date, text:f.text, images:f.images?.map(i=>i.name)||[]});
+        }
+        setFollowups(next);
+      }}
+      addNotif={addNotif} currentUser={user}
+    />,
+    campaigns: <Campaigns
+      campaigns={campaigns}
+      setCampaigns={(fn) => {
+        const prev = campaigns;
+        const next = typeof fn === "function" ? fn(prev) : fn;
+        if (next.length > prev.length) {
+          const c = next[next.length-1];
+          save("campaigns", {client_id:c.clientId, platform:c.platform, week_start:c.week, spend:c.spend, clicks:c.clicks, impressions:c.impressions, purchases:c.purchases, purchase_value:c.purchaseValue, roas:c.roas, ctr:c.ctr, cpm:c.cpm, cpc:c.cpc});
+        } else if (next.length < prev.length) {
+          const removed = prev.find(c => !next.find(x => x.id === c.id));
+          if (removed) del("campaigns", {id: removed.id});
+        }
+        setCampaigns(next);
+      }}
+      clients={clients} users={users} currentUser={user}
+    />,
+    ai: <AIAnalysis clients={clients} campaigns={campaigns} users={users}/>,
+    tasks: <Tasks
+      tasks={tasks}
+      setTasks={(fn) => {
+        const prev = tasks;
+        const next = typeof fn === "function" ? fn(prev) : fn;
+        if (next.length > prev.length) {
+          const t = next[next.length-1];
+          save("tasks", {title:t.title, assigned_to:t.assignedTo, client_id:t.clientId, due_date:t.due, priority:t.priority, status:t.status});
+        } else if (next.length < prev.length) {
+          const removed = prev.find(t => !next.find(x => x.id === t.id));
+          if (removed) del("tasks", {id: removed.id});
+        } else {
+          const changed = next.find((t,i) => t.status !== prev[i]?.status);
+          if (changed) update("tasks", {status:changed.status}, {id:changed.id});
+        }
+        setTasks(next);
+      }}
+      clients={clients} users={users} currentUser={user}
+    />,
+    reports: <Reports clients={clients} campaigns={campaigns} users={users}/>,
+    churn: <ChurnTracker clients={clients} users={users}/>,
+    targets: <Targets clients={clients} campaigns={campaigns} users={users} targets={targets} setTargets={setTargets}/>,
+    scorecard: <Scorecard clients={clients} campaigns={campaigns} tasks={tasks} users={users}/>,
+    satisfaction: <Satisfaction
+      clients={clients} satisfaction={satisfaction}
+      setSatisfaction={(fn) => {
+        const prev = satisfaction;
+        const next = typeof fn === "function" ? fn(prev) : fn;
+        if (next.length > prev.length) {
+          const s = next[next.length-1];
+          save("satisfaction", {client_id:s.clientId, month:s.month, score_overall:s.score, comment:s.comment});
+        }
+        setSatisfaction(next);
+      }}
+      users={users}
+    />,
+    payroll: user.role === "admin"
+      ? <Payroll users={users} clients={clients} payroll={payroll}
+          setPayroll={(fn) => {
+            const next = typeof fn === "function" ? fn(payroll) : fn;
+            setPayroll(next);
+            next.forEach(p => {
+              if(window.__SB) window.__SB.from("payroll").upsert({user_id:p.userId||p.user_id, month:p.month||"2025-05", base_salary:p.base||0, commission:p.commission||0, bonus:p.bonus||0, deductions:p.deductions||0, note:p.note||""},{onConflict:"user_id,month"}).then(()=>{}).catch(()=>{});
+            });
+          }}
+        />
+      : <div style={{padding:32,color:C.red}}>غير مصرح</div>,
+    team: user.role === "admin"
+      ? <TeamMgmt users={users} setUsers={setUsers}/>
+      : <div style={{padding:32,color:C.red}}>غير مصرح</div>,
   };
-  return(
-    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"Cairo",direction:"rtl",display:"flex"}}>
+
+  return (
+    <div style={{minHeight:"100vh", background:C.bg, fontFamily:"Cairo", direction:"rtl", display:"flex"}}>
       <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
-      <Sidebar page={page} setPage={setPage} user={user} onLogout={()=>setUser(null)} unread={unread}/>
-      <main style={{flex:1,marginRight:230,overflowY:"auto",minHeight:"100vh",paddingBottom:40}}>
-        <div style={{position:"sticky",top:0,zIndex:50,background:`${C.bg}ee`,backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.border}`,padding:"9px 28px",display:"flex",justifyContent:"flex-end"}}>
+      <Sidebar page={page} setPage={setPage} user={user} onLogout={() => setUser(null)} unread={unread}/>
+      <main style={{flex:1, marginRight:230, overflowY:"auto", minHeight:"100vh", paddingBottom:40}}>
+        <div style={{position:"sticky",top:0,zIndex:50,background:`${C.bg}ee`,backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.border}`,padding:"9px 28px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:11,fontWeight:600,color:dbReady?C.green:C.orange}}>
+            {dbReady ? "● متصل بـ Supabase" : "● محفوظ محلياً — يتزامن مع Supabase تلقائياً"}
+          </span>
           <NotifBell notifs={notifs} setNotifs={setNotifs} userId={user.id}/>
         </div>
-        {P[page]||P.dashboard}
+        {P[page] || P.dashboard}
       </main>
       <style>{`*{box-sizing:border-box}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}select option{background:#0D1526}button:hover:not(:disabled){filter:brightness(1.07)}`}</style>
     </div>
