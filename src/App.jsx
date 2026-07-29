@@ -1941,25 +1941,23 @@ function TeamMgmt({users,setUsers}){
         if(window.__SB) await window.__SB.from("users").update({name:f.name,role:f.role,avatar:av}).eq("id",edit.id);
       }else{
         if(users.find(u=>u.email===f.email)){setErr("البريد مستخدم");setSaving(false);return;}
-        // Create Supabase Auth user (admin.createUser needs a service-role key
-        // that must never be exposed in the browser, so we go straight to signUp).
-        // Wrapped in its own try/catch so a Supabase hiccup never blocks the
-        // local save — same local-first philosophy as the rest of the app.
+        // Create Supabase Auth user
         let authId=null;
         if(window.__SB){
-          try{
-            const {data:sd,error:signErr}=await window.__SB.auth.signUp({email:f.email,password:f.password});
-            if(signErr) throw signErr;
+          const {data,error}=await window.__SB.auth.admin?.createUser({email:f.email,password:f.password,email_confirm:true}).catch(()=>({data:null,error:"no admin"}));
+          if(data?.user) authId=data.user.id;
+          // If admin API not available, use signup
+          if(!authId){
+            const {data:sd}=await window.__SB.auth.signUp({email:f.email,password:f.password});
             authId=sd?.user?.id||null;
-            await window.__SB.from("users").insert({auth_id:authId,name:f.name,email:f.email,role:f.role,avatar:av});
-          }catch(syncErr){
-            console.error("Supabase sync failed, saved locally only:", syncErr);
           }
+          // Insert into users table
+          await window.__SB.from("users").insert({auth_id:authId,name:f.name,email:f.email,role:f.role,avatar:av});
         }
         setUsers(p=>[...p,{id:authId||Date.now(),...f,avatar:av}]);
       }
       setOpen(false);setErr("");
-    }catch(e){setErr(e?.message?`حدث خطأ: ${e.message}`:"حدث خطأ — تحقق من الاتصال");}
+    }catch(e){setErr("حدث خطأ — تحقق من الاتصال");}
     setSaving(false);
   };
   return(
