@@ -2595,13 +2595,19 @@ export default function App(){
 
   // ─── SUPABASE INIT ────────────────────────────────────────────────────────
   useEffect(() => {
-    const url = import.meta?.env?.VITE_SUPABASE_URL;
-    const key = import.meta?.env?.VITE_SUPABASE_ANON_KEY;
-    if (!url || !key) return;
+    // 🔧 DIAGNOSTIC TEST — hardcoded temporarily to rule out env var issues.
+    // Remove this block and restore the env-var version once confirmed working.
+    const url = "https://jokdohhukkbrergfauwc.supabase.co";
+    const key = "sb_publishable_DkwiFcNG0im57wftL-lATw_l4Z1TCvs";
+    console.log("[DIAG] Supabase init starting with hardcoded values...");
+    if (!url || !key) { console.log("[DIAG] Missing url/key — stopping."); return; }
     import("https://esm.sh/@supabase/supabase-js@2").then(({createClient}) => {
       window.__SB = createClient(url, key);
+      console.log("[DIAG] window.__SB created successfully:", window.__SB);
       loadFromDB();
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error("[DIAG] Failed to load supabase-js from esm.sh:", err);
+    });
   }, []);
 
   const loadFromDB = async () => {
