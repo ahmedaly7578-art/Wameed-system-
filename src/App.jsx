@@ -1942,14 +1942,19 @@ function TeamMgmt({users,setUsers}){
       }else{
         if(users.find(u=>u.email===f.email)){setErr("البريد مستخدم");setSaving(false);return;}
         // Create Supabase Auth user (admin.createUser needs a service-role key
-        // that must never be exposed in the browser, so we go straight to signUp)
+        // that must never be exposed in the browser, so we go straight to signUp).
+        // Wrapped in its own try/catch so a Supabase hiccup never blocks the
+        // local save — same local-first philosophy as the rest of the app.
         let authId=null;
         if(window.__SB){
-          const {data:sd,error:signErr}=await window.__SB.auth.signUp({email:f.email,password:f.password});
-          authId=sd?.user?.id||null;
-          if(signErr) throw signErr;
-          // Insert into users table
-          await window.__SB.from("users").insert({auth_id:authId,name:f.name,email:f.email,role:f.role,avatar:av});
+          try{
+            const {data:sd,error:signErr}=await window.__SB.auth.signUp({email:f.email,password:f.password});
+            if(signErr) throw signErr;
+            authId=sd?.user?.id||null;
+            await window.__SB.from("users").insert({auth_id:authId,name:f.name,email:f.email,role:f.role,avatar:av});
+          }catch(syncErr){
+            console.error("Supabase sync failed, saved locally only:", syncErr);
+          }
         }
         setUsers(p=>[...p,{id:authId||Date.now(),...f,avatar:av}]);
       }
