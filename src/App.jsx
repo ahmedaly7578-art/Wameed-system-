@@ -1941,23 +1941,20 @@ function TeamMgmt({users,setUsers}){
         if(window.__SB) await window.__SB.from("users").update({name:f.name,role:f.role,avatar:av}).eq("id",edit.id);
       }else{
         if(users.find(u=>u.email===f.email)){setErr("البريد مستخدم");setSaving(false);return;}
-        // Create Supabase Auth user
+        // Create Supabase Auth user (admin.createUser needs a service-role key
+        // that must never be exposed in the browser, so we go straight to signUp)
         let authId=null;
         if(window.__SB){
-          const {data,error}=await window.__SB.auth.admin?.createUser({email:f.email,password:f.password,email_confirm:true}).catch(()=>({data:null,error:"no admin"}));
-          if(data?.user) authId=data.user.id;
-          // If admin API not available, use signup
-          if(!authId){
-            const {data:sd}=await window.__SB.auth.signUp({email:f.email,password:f.password});
-            authId=sd?.user?.id||null;
-          }
+          const {data:sd,error:signErr}=await window.__SB.auth.signUp({email:f.email,password:f.password});
+          authId=sd?.user?.id||null;
+          if(signErr) throw signErr;
           // Insert into users table
           await window.__SB.from("users").insert({auth_id:authId,name:f.name,email:f.email,role:f.role,avatar:av});
         }
         setUsers(p=>[...p,{id:authId||Date.now(),...f,avatar:av}]);
       }
       setOpen(false);setErr("");
-    }catch(e){setErr("حدث خطأ — تحقق من الاتصال");}
+    }catch(e){setErr(e?.message?`حدث خطأ: ${e.message}`:"حدث خطأ — تحقق من الاتصال");}
     setSaving(false);
   };
   return(
@@ -2595,19 +2592,13 @@ export default function App(){
 
   // ─── SUPABASE INIT ────────────────────────────────────────────────────────
   useEffect(() => {
-    // 🔧 DIAGNOSTIC TEST — hardcoded temporarily to rule out env var issues.
-    // Remove this block and restore the env-var version once confirmed working.
-    const url = "https://jokdohhukkbrergfauwc.supabase.co";
-    const key = "sb_publishable_DkwiFcNG0im57wftL-lATw_l4Z1TCvs";
-    console.log("[DIAG] Supabase init starting with hardcoded values...");
-    if (!url || !key) { console.log("[DIAG] Missing url/key — stopping."); return; }
+    const url = import.meta?.env?.VITE_SUPABASE_URL;
+    const key = import.meta?.env?.VITE_SUPABASE_ANON_KEY;
+    if (!url || !key) return;
     import("https://esm.sh/@supabase/supabase-js@2").then(({createClient}) => {
       window.__SB = createClient(url, key);
-      console.log("[DIAG] window.__SB created successfully:", window.__SB);
       loadFromDB();
-    }).catch((err) => {
-      console.error("[DIAG] Failed to load supabase-js from esm.sh:", err);
-    });
+    }).catch(() => {});
   }, []);
 
   const loadFromDB = async () => {
