@@ -1947,15 +1947,13 @@ function TeamMgmt({users,setUsers}){
         if(window.__SB){
           const {data:sd,error:signErr}=await window.__SB.auth.signUp({email:f.email,password:f.password});
           if(signErr){
-            alert("فشل إنشاء حساب الدخول: "+signErr.message);
-          }else if(!sd?.user){
-            alert("تحذير: الإيميل ده يمكن يكون مسجل قبل كده في نظام تسجيل الدخول.");
-          }else{
+            console.error("فشل إنشاء حساب الدخول:",signErr.message);
+          }else if(sd?.user){
             authId=sd.user.id;
           }
           // Insert into users table
           const {error:insErr}=await window.__SB.from("users").insert({name:f.name,email:f.email,role:f.role,avatar:av});
-          if(insErr) alert("فشل حفظ بيانات المستخدم في الجدول: "+insErr.message);
+          if(insErr) console.error("فشل حفظ بيانات المستخدم في الجدول:",insErr.message);
         }
         setUsers(p=>[...p,{id:authId||Date.now(),...f,avatar:av}]);
       }
@@ -2564,7 +2562,8 @@ const ls = {
 };
 
 export default function App(){
-  const [user, setUser] = useState(null);
+  const [user, setUserRaw] = useState(() => ls.get("w_currentUser", null));
+  const setUser = (u) => { setUserRaw(u); if(u) ls.set("w_currentUser", u); else ls.set("w_currentUser", null); };
   const [page, setPage] = useState("dashboard");
   const [dbReady, setDbReady] = useState(false);
 
