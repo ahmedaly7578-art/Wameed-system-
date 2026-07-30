@@ -1941,20 +1941,21 @@ function TeamMgmt({users,setUsers}){
         if(window.__SB) await window.__SB.from("users").update({name:f.name,role:f.role,avatar:av}).eq("id",edit.id);
       }else{
         if(users.find(u=>u.email===f.email)){setErr("البريد مستخدم");setSaving(false);return;}
-        // Create Supabase Auth user
+        // Create Supabase Auth login account (admin.createUser needs a service-role
+        // key that can never be exposed client-side, so we go straight to signUp)
         let authId=null;
         if(window.__SB){
-          const {data,error}=await window.__SB.auth.admin?.createUser({email:f.email,password:f.password,email_confirm:true}).catch(()=>({data:null,error:"no admin"}));
-          if(data?.user) authId=data.user.id;
-          // If admin API not available, use signup
-          if(!authId){
-            const {data:sd,error:signErr}=await window.__SB.auth.signUp({email:f.email,password:f.password});
-            if(signErr) console.error("signUp failed:", signErr);
-            authId=sd?.user?.id||null;
+          const {data:sd,error:signErr}=await window.__SB.auth.signUp({email:f.email,password:f.password});
+          if(signErr){
+            alert("فشل إنشاء حساب الدخول: "+signErr.message);
+          }else if(!sd?.user){
+            alert("تحذير: الإيميل ده يمكن يكون مسجل قبل كده في نظام تسجيل الدخول.");
+          }else{
+            authId=sd.user.id;
           }
           // Insert into users table
           const {error:insErr}=await window.__SB.from("users").insert({name:f.name,email:f.email,role:f.role,avatar:av});
-          if(insErr) console.error("Failed to save user to Supabase:", insErr);
+          if(insErr) alert("فشل حفظ بيانات المستخدم في الجدول: "+insErr.message);
         }
         setUsers(p=>[...p,{id:authId||Date.now(),...f,avatar:av}]);
       }
