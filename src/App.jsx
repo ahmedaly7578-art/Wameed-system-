@@ -2595,13 +2595,17 @@ export default function App(){
 
   // ─── SUPABASE INIT ────────────────────────────────────────────────────────
   useEffect(() => {
-    const url = import.meta?.env?.VITE_SUPABASE_URL;
-    const key = import.meta?.env?.VITE_SUPABASE_ANON_KEY;
+    // Hardcoded directly — Vercel's env var injection for this project wasn't
+    // reliably reaching the build, so we bypass it entirely. The publishable
+    // key is safe to ship in client code by design; real protection lives in
+    // the RLS policies on each table.
+    const url = "https://jokdohhukkbrergfauwc.supabase.co";
+    const key = "sb_publishable_DkwiFcNG0im57wftL-lATw_l4Z1TCvs";
     if (!url || !key) return;
     import("https://esm.sh/@supabase/supabase-js@2").then(({createClient}) => {
       window.__SB = createClient(url, key);
       loadFromDB();
-    }).catch(() => {});
+    }).catch((err) => console.error("Failed to load supabase-js:", err));
   }, []);
 
   const loadFromDB = async () => {
