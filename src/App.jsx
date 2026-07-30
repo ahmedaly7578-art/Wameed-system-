@@ -1948,11 +1948,13 @@ function TeamMgmt({users,setUsers}){
           if(data?.user) authId=data.user.id;
           // If admin API not available, use signup
           if(!authId){
-            const {data:sd}=await window.__SB.auth.signUp({email:f.email,password:f.password});
+            const {data:sd,error:signErr}=await window.__SB.auth.signUp({email:f.email,password:f.password});
+            if(signErr) console.error("signUp failed:", signErr);
             authId=sd?.user?.id||null;
           }
           // Insert into users table
-          await window.__SB.from("users").insert({auth_id:authId,name:f.name,email:f.email,role:f.role,avatar:av});
+          const {error:insErr}=await window.__SB.from("users").insert({name:f.name,email:f.email,role:f.role,avatar:av});
+          if(insErr) console.error("Failed to save user to Supabase:", insErr);
         }
         setUsers(p=>[...p,{id:authId||Date.now(),...f,avatar:av}]);
       }
@@ -2470,7 +2472,7 @@ function Login({onLogin}){
         try{
           const {data,error}=await window.__SB.auth.signInWithPassword({email:em,password:pw});
           if(!error&&data?.user){
-            const {data:profile}=await window.__SB.from("users").select("*").eq("auth_id",data.user.id).single();
+            const {data:profile}=await window.__SB.from("users").select("*").eq("email",em).single();
             if(profile){onLogin({type:"team",...profile,avatar:profile.avatar||ini(profile.name)});setLoading(false);return;}
           }
         }catch(e){}
