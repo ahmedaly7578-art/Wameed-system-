@@ -1966,7 +1966,7 @@ function TeamMgmt({users,setUsers}){
         <Inp label="الاسم الكامل" value={f.name} onChange={v=>sf("name",v)} req placeholder="أحمد محمد"/>
         <Inp label="البريد الإلكتروني" value={f.email} onChange={v=>sf("email",v)} type="email" req placeholder="ahmed@wameed.sa"/>
         <Inp label="كلمة المرور" value={f.password} onChange={v=>sf("password",v)} req placeholder="••••••••"/>
-        <Sel label="الدور" value={f.role} onChange={v=>sf("role",v)} opts={[{v:"media_buyer",l:"Media Buyer"},{v:"social_media",l:"Social Media"},{v:"account_manager",l:"Account Manager"},{v:"designer",l:"Designer"}]} req/>
+        <Sel label="الدور" value={f.role} onChange={v=>sf("role",v)} opts={[{v:"admin",l:"مدير النظام (صلاحيات كاملة)"},{v:"media_buyer",l:"Media Buyer"},{v:"social_media",l:"Social Media"},{v:"account_manager",l:"Account Manager"},{v:"designer",l:"Designer"}]} req/>
         {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
         <div style={{display:"flex",gap:10}}>
           <Btn onClick={save} style={{flex:1,padding:13,opacity:saving?0.7:1}}>
@@ -1979,7 +1979,7 @@ function TeamMgmt({users,setUsers}){
         <Btn onClick={()=>{setF({name:"",role:"media_buyer",email:"",password:""});setErr("");setEdit(null);setOpen(true)}}>+ إضافة</Btn>
       </TB>
       <div style={{padding:"0 32px"}}>
-        {[["media_buyer","Media Buyers","📊"],["social_media","Social Media","📱"],["account_manager","Account Managers","📋"],["designer","Designers","🎨"]].map(([role,label,icon])=>(
+        {[["admin","مديرو النظام","👑"],["media_buyer","Media Buyers","📊"],["social_media","Social Media","📱"],["account_manager","Account Managers","📋"],["designer","Designers","🎨"]].map(([role,label,icon])=>(
           <div key={role} style={{marginBottom:24}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}><span style={{fontSize:16}}>{icon}</span><div style={{color:C.textS,fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</div><Bdg label={`${users.filter(u=>u.role===role).length}`} color={RC[role]}/></div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
@@ -2624,7 +2624,14 @@ export default function App(){
         window.__SB.from("payroll").select("*"),
         window.__SB.from("creative_tasks").select("*").order("created_at",{ascending:false}),
       ]);
-      if(dU?.length) { const v=dU.map(u=>({...u,avatar:u.avatar||ini(u.name)})); setUsersRaw(v); ls.set("w_users",v); }
+      if(dU?.length) {
+        const v=dU.map(u=>({...u,avatar:u.avatar||ini(u.name)}));
+        // الأدمن الأساسي (IU[0]) لازم يفضل موجود دايمًا حتى لو قاعدة البيانات
+        // فيها بيانات، عشان تسجيل الدخول ميتقفلش عليه أبدًا.
+        const hasSuperAdmin = v.some(u=>u.email===IU[0].email);
+        const merged = hasSuperAdmin ? v : [IU[0], ...v];
+        setUsersRaw(merged); ls.set("w_users",merged);
+      }
       if(dC?.length) { const v=dC.map(c=>({...c,mb:c.mb_id,sm:c.sm_id,am:c.am_id,pkg:c.pkg_amount,start:c.start_date,end:c.end_date,spend:c.total_spend})); setClientsRaw(v); ls.set("w_clients",v); }
       if(dF?.length) { const v=dF.map(f=>({...f,clientId:f.client_id,userId:f.user_id,images:f.images||[]})); setFollowupsRaw(v); ls.set("w_followups",v); }
       if(dCa?.length) { const v=dCa.map(c=>({...c,clientId:c.client_id,week:c.week_start,purchaseValue:c.purchase_value})); setCampaignsRaw(v); ls.set("w_campaigns",v); }
