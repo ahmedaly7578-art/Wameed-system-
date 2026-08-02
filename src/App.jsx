@@ -2613,9 +2613,10 @@ export default function App(){
   // ─── CREATIVE MODULE — الجوجل شيت هو قاعدة البيانات، مباشرة، من غير Supabase ─
   const CREATIVE_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/creative-sheet-api";
   const CREATIVE_API_SECRET = "wameed-creative-9f3a7b2e1d8c4f6a";
+  const creativeUrl = () => `${CREATIVE_API}?secret=${encodeURIComponent(CREATIVE_API_SECRET)}`;
   const loadCreativeFromSheet = async () => {
     try {
-      const res = await fetch(CREATIVE_API, { headers: { "X-App-Secret": CREATIVE_API_SECRET } });
+      const res = await fetch(creativeUrl());
       const data = await res.json();
       if (data?.tasks) { setCreativeTasksRaw(data.tasks); ls.set("w_creative", data.tasks); }
     } catch(e) { console.error("Failed to load creative tasks from sheet:", e); }
@@ -2757,17 +2758,17 @@ export default function App(){
       setTasks={async (fn) => {
         const prev = creativeTasks;
         const next = typeof fn === "function" ? fn(prev) : fn;
-        const opts = { headers: {"Content-Type":"application/json","X-App-Secret":CREATIVE_API_SECRET} };
+        const opts = { headers: {"Content-Type":"application/json"} };
         try{
           if (next.length > prev.length) {
             const t = next[next.length-1];
-            await fetch(CREATIVE_API, {...opts, method:"POST", body: JSON.stringify(t)});
+            await fetch(creativeUrl(), {...opts, method:"POST", body: JSON.stringify(t)});
           } else if (next.length < prev.length) {
             const removed = prev.find(t => !next.find(x => x.id === t.id));
-            if (removed) await fetch(CREATIVE_API, {...opts, method:"DELETE", body: JSON.stringify({id: removed.id})});
+            if (removed) await fetch(creativeUrl(), {...opts, method:"DELETE", body: JSON.stringify({id: removed.id})});
           } else {
             const changed = next.find((t,i) => JSON.stringify(t) !== JSON.stringify(prev[i]));
-            if (changed) await fetch(CREATIVE_API, {...opts, method:"PUT", body: JSON.stringify(changed)});
+            if (changed) await fetch(creativeUrl(), {...opts, method:"PUT", body: JSON.stringify(changed)});
           }
         }catch(e){ console.error("Creative sheet sync failed:", e); }
         setCreativeTasks(next);
