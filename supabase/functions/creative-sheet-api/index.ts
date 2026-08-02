@@ -36,7 +36,7 @@ const ID_COL = FIELDS.length; // 19 -> column T
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type,X-App-Secret",
+  "Access-Control-Allow-Headers": "Content-Type",
 };
 
 function json(body: unknown, status = 200) {
@@ -89,7 +89,8 @@ async function findRow(sheets: any, id: string): Promise<number | null> {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
-  if (req.headers.get("X-App-Secret") !== API_SECRET) {
+  const reqUrl = new URL(req.url);
+  if (reqUrl.searchParams.get("secret") !== API_SECRET) {
     return json({ error: "unauthorized" }, 401);
   }
 
