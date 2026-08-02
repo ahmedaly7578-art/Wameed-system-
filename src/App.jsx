@@ -2610,12 +2610,24 @@ export default function App(){
     }).catch((err) => console.error("Failed to load supabase-js:", err));
   }, []);
 
+  // ─── CREATIVE MODULE — الجوجل شيت هو قاعدة البيانات، مباشرة، من غير Supabase ─
+  const CREATIVE_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/creative-sheet-api";
+  const CREATIVE_API_SECRET = "wameed-creative-9f3a7b2e1d8c4f6a";
+  const loadCreativeFromSheet = async () => {
+    try {
+      const res = await fetch(CREATIVE_API, { headers: { "X-App-Secret": CREATIVE_API_SECRET } });
+      const data = await res.json();
+      if (data?.tasks) { setCreativeTasksRaw(data.tasks); ls.set("w_creative", data.tasks); }
+    } catch(e) { console.error("Failed to load creative tasks from sheet:", e); }
+  };
+  useEffect(() => { if (page === "creative") loadCreativeFromSheet(); }, [page]);
+
   const loadFromDB = async () => {
     if (!window.__SB) return;
     try {
       const [
         {data:dU}, {data:dC}, {data:dF}, {data:dCa},
-        {data:dT}, {data:dS}, {data:dP}, {data:dCr}
+        {data:dT}, {data:dS}, {data:dP}
       ] = await Promise.all([
         window.__SB.from("users").select("*"),
         window.__SB.from("clients").select("*"),
@@ -2624,7 +2636,6 @@ export default function App(){
         window.__SB.from("tasks").select("*"),
         window.__SB.from("satisfaction").select("*"),
         window.__SB.from("payroll").select("*"),
-        window.__SB.from("creative_tasks").select("*").order("created_at",{ascending:false}),
       ]);
       if(dU?.length) {
         const v=dU.map(u=>({...u,avatar:u.avatar||ini(u.name)}));
@@ -2640,7 +2651,7 @@ export default function App(){
       if(dT?.length) { const v=dT.map(t=>({...t,assignedTo:t.assigned_to,clientId:t.client_id,due:t.due_date})); setTasksRaw(v); ls.set("w_tasks",v); }
       if(dS?.length) { const v=dS.map(s=>({...s,clientId:s.client_id,score:s.score_overall,roas:s.score_roas,speed:s.score_speed,reports:s.score_reports})); setSatisfactionRaw(v); ls.set("w_satisfaction",v); }
       if(dP?.length) { const v=dP.map(p=>({...p,userId:p.user_id,base:p.base_salary})); setPayrollRaw(v); ls.set("w_payroll",v); }
-      if(dCr?.length) { const v=dCr.map(t=>({...t,clientId:t.client_id,clientName:t.client_name,designerId:t.designer_id,designerName:t.designer_name,taskDate:t.task_date,deadLine:t.dead_line,strategyLink:t.strategy_link,websiteLink:t.website_link,noOfSizes:t.no_of_sizes,uploadFolder:t.upload_folder,uploadDate:t.upload_date,directorApproved:t.director_approved,timeNote:t.time_note})); setCreativeTasksRaw(v); ls.set("w_creative",v); }
+      // creative_tasks بقى بيتقرا من الجوجل شيت مباشرة (loadCreativeFromSheet)، مش من هنا.
       setDbReady(true);
     } catch(e) { console.log("DB error:", e); }
   };
@@ -2743,29 +2754,24 @@ export default function App(){
     />,
     creative: <CreativeTasks
       tasks={creativeTasks}
-      setTasks={(fn) => {
+      setTasks={async (fn) => {
         const prev = creativeTasks;
         const next = typeof fn === "function" ? fn(prev) : fn;
-        const toRow = (t) => ({
-          agency:t.agency, department:t.department, strategy_link:t.strategyLink,
-          client_id:t.clientId||null, client_name:t.clientName, website_link:t.websiteLink,
-          task_date:t.taskDate, notes:t.notes, dead_line:t.deadLine,
-          designer_id:t.designerId||null, designer_name:t.designerName, forum:t.forum,
-          no_of_sizes:t.noOfSizes, size:t.size, status:t.status,
-          upload_folder:t.uploadFolder, upload_date:t.uploadDate||null,
-          done:t.done, director_approved:t.directorApproved, time_note:t.timeNote,
-        });
-        if (next.length > prev.length) {
-          const t = next[next.length-1];
-          save("creative_tasks", toRow(t));
-        } else if (next.length < prev.length) {
-          const removed = prev.find(t => !next.find(x => x.id === t.id));
-          if (removed) del("creative_tasks", {id: removed.id});
-        } else {
-          const changed = next.find((t,i) => JSON.stringify(t) !== JSON.stringify(prev[i]));
-          if (changed) update("creative_tasks", toRow(changed), {id:changed.id});
-        }
+        const opts = { headers: {"Content-Type":"application/json","X-App-Secret":CREATIVE_API_SECRET} };
+        try{
+          if (next.length > prev.length) {
+            const t = next[next.length-1];
+            await fetch(CREATIVE_API, {...opts, method:"POST", body: JSON.stringify(t)});
+          } else if (next.length < prev.length) {
+            const removed = prev.find(t => !next.find(x => x.id === t.id));
+            if (removed) await fetch(CREATIVE_API, {...opts, method:"DELETE", body: JSON.stringify({id: removed.id})});
+          } else {
+            const changed = next.find((t,i) => JSON.stringify(t) !== JSON.stringify(prev[i]));
+            if (changed) await fetch(CREATIVE_API, {...opts, method:"PUT", body: JSON.stringify(changed)});
+          }
+        }catch(e){ console.error("Creative sheet sync failed:", e); }
         setCreativeTasks(next);
+        loadCreativeFromSheet();
       }}
       clients={clients} users={users} currentUser={user}
     />,
