@@ -90,9 +90,8 @@ async function findRow(sheets: any, id: string): Promise<number | null> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   const reqUrl = new URL(req.url);
-  if (reqUrl.searchParams.get("secret") !== API_SECRET) {
-    return json({ error: "unauthorized" }, 401);
-  }
+ const incomingSecret = reqUrl.searchParams.get("secret") ?? req.headers.get("x-app-secret") ?? "";
+if (incomingSecret !== API_SECRET) {
 
   try {
     const sheets = await getSheetsClient();
