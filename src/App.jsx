@@ -2611,7 +2611,7 @@ export default function App(){
   }, []);
 
   // ─── CREATIVE MODULE — الجوجل شيت هو قاعدة البيانات، مباشرة، من غير Supabase ─
-  const CREATIVE_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/creative-sheet-api";
+  const CREATIVE_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/creative-sheet-api-";
   const CREATIVE_API_SECRET = "wameed-creative-9f3a7b2e1d8c4f6a";
   const creativeUrl = () => `${CREATIVE_API}?secret=${encodeURIComponent(CREATIVE_API_SECRET)}`;
   const loadCreativeFromSheet = async () => {
