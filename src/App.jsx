@@ -171,36 +171,112 @@ const NAV=[
   {id:"team",icon:"🧑‍💼",label:"إدارة الفريق",admin:true},
 ];
 
-function Sidebar({page,setPage,user,onLogout,unread}){
+function Sidebar({page,setPage,user,onLogout,unread,setUsers,users}){
+  const [open,setOpen]=useState(false);
+  const fileRef=useRef();
+
+  useEffect(()=>{
+    const isMobile=window.innerWidth<=768;
+    const sidebar=document.getElementById("main-sidebar");
+    const topbar=document.getElementById("mobile-topbar");
+    const main=document.querySelector(".main-content");
+    if(isMobile){
+      if(topbar)topbar.style.display="flex";
+      if(main)main.style.marginRight="0";
+      if(main)main.style.paddingTop="56px";
+    }
+    if(sidebar){
+      sidebar.style.transform=open&&isMobile?"translateX(0)":"";
+      if(!isMobile)sidebar.style.transform="";
+    }
+  },[open]);
+
+  useEffect(()=>{
+    const handleResize=()=>{
+      const isMobile=window.innerWidth<=768;
+      const sidebar=document.getElementById("main-sidebar");
+      const topbar=document.getElementById("mobile-topbar");
+      const main=document.querySelector(".main-content");
+      if(topbar)topbar.style.display=isMobile?"flex":"none";
+      if(main){main.style.marginRight=isMobile?"0":"230px";main.style.paddingTop=isMobile?"56px":"0";}
+      if(sidebar&&!isMobile)sidebar.style.transform="";
+    };
+    window.addEventListener("resize",handleResize);
+    handleResize();
+    return()=>window.removeEventListener("resize",handleResize);
+  },[]);
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const photoUrl=ev.target.result;
+      setUsers(p=>{const next=p.map(u=>u.id===user.id?{...u,photo:photoUrl}:u);ls.set("w_users",next);return next;});
+      user.photo=photoUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const currentUser=users?.find(u=>u.id===user.id)||user;
+
   return(
-    <div style={{width:230,background:C.bgCard,borderLeft:`1px solid ${C.border}`,display:"flex",flexDirection:"column",height:"100vh",position:"fixed",right:0,top:0,zIndex:100,overflowY:"auto"}}>
-      <div style={{padding:"20px 20px 16px",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <svg width={24} height={24} viewBox="0 0 60 60" fill="none"><defs><linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E879A0"/><stop offset="100%" stopColor="#7B6FE0"/></linearGradient></defs><path d="M30 2 L36 22 L56 22 L40 35 L46 55 L30 43 L14 55 L20 35 L4 22 L24 22 Z" fill="url(#sg)"/></svg>
-          <div><div style={{color:C.text,fontSize:15,fontWeight:900,lineHeight:1.1}}>وميض</div><div style={{fontSize:9,fontWeight:700,letterSpacing:4,background:C.grad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>WAMEED</div></div>
+    <>
+      {/* Mobile overlay */}
+      {open&&<div onClick={()=>setOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:99}}/>}
+
+      {/* Mobile top bar */}
+      <div style={{display:"none",position:"fixed",top:0,right:0,left:0,zIndex:98,background:C.bgCard,borderBottom:`1px solid ${C.border}`,padding:"12px 16px",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(0,0,0,0.3)"}} id="mobile-topbar">
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <svg width={20} height={20} viewBox="0 0 60 60" fill="none"><defs><linearGradient id="sgm" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E879A0"/><stop offset="100%" stopColor="#7B6FE0"/></linearGradient></defs><path d="M30 2 L36 22 L56 22 L40 35 L46 55 L30 43 L14 55 L20 35 L4 22 L24 22 Z" fill="url(#sgm)"/></svg>
+          <div style={{color:C.text,fontSize:14,fontWeight:900}}>وميض</div>
+        </div>
+        <button onClick={()=>setOpen(!open)} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 12px",color:C.text,cursor:"pointer",fontSize:18}}>☰</button>
+      </div>
+
+      {/* Sidebar */}
+      <div style={{width:230,background:C.bgCard,borderLeft:`1px solid ${C.border}`,display:"flex",flexDirection:"column",height:"100vh",position:"fixed",right:0,top:0,zIndex:100,overflowY:"auto",transition:"transform .25s ease"}} id="main-sidebar">
+        <div style={{padding:"20px 20px 16px",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <svg width={24} height={24} viewBox="0 0 60 60" fill="none"><defs><linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E879A0"/><stop offset="100%" stopColor="#7B6FE0"/></linearGradient></defs><path d="M30 2 L36 22 L56 22 L40 35 L46 55 L30 43 L14 55 L20 35 L4 22 L24 22 Z" fill="url(#sg)"/></svg>
+            <div><div style={{color:C.text,fontSize:15,fontWeight:900,lineHeight:1.1}}>وميض</div><div style={{fontSize:9,fontWeight:700,letterSpacing:4,background:C.grad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>WAMEED</div></div>
+          </div>
+        </div>
+        <nav style={{flex:1,padding:"8px 8px"}}>
+          {NAV.filter(n=>!n.admin||user.role==="admin").map(n=>{
+            const a=page===n.id;
+            return(
+              <button key={n.id} onClick={()=>{setPage(n.id);setOpen(false);}} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,marginBottom:2,background:a?`${C.pink}18`:"transparent",border:a?`1px solid ${C.pink}33`:"1px solid transparent",cursor:"pointer",fontFamily:"Cairo",transition:"all .15s",color:a?C.pink:C.textS,fontSize:12.5,fontWeight:a?600:400,textAlign:"right"}}
+                onMouseEnter={e=>{if(!a)e.currentTarget.style.background="rgba(255,255,255,0.04)"}}
+                onMouseLeave={e=>{if(!a)e.currentTarget.style.background="transparent"}}>
+                <span style={{fontSize:14}}>{n.icon}</span>{n.label}
+                {n.id==="followup"&&unread>0&&<span style={{marginRight:"auto",background:C.pink,color:"white",fontSize:9,fontWeight:700,borderRadius:10,padding:"2px 6px"}}>{unread}</span>}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* User profile section */}
+        <div style={{padding:12,borderTop:`1px solid ${C.border}`,flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+            {/* Profile photo with upload */}
+            <div style={{position:"relative",flexShrink:0}}>
+              {currentUser.photo
+                ? <img src={currentUser.photo} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",border:`1.5px solid ${RC[user.role]}55`}} alt=""/>
+                : <Av text={user.avatar} color={RC[user.role]} size={36}/>
+              }
+              <button onClick={()=>fileRef.current?.click()} title="تغيير الصورة"
+                style={{position:"absolute",bottom:-2,left:-2,width:16,height:16,borderRadius:"50%",background:C.purple,border:`1.5px solid ${C.bgCard}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:8,color:"white",padding:0}}>
+                ✏️
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{display:"none"}}/>
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:C.text,fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.name}</div>
+              <div style={{color:RC[user.role],fontSize:10,fontWeight:500}}>{RL[user.role]}</div>
+            </div>
+          </div>
+          <button onClick={onLogout} style={{width:"100%",padding:"7px",borderRadius:9,fontFamily:"Cairo",background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:12,fontWeight:600,cursor:"pointer"}}>تسجيل الخروج</button>
         </div>
       </div>
-      <nav style={{flex:1,padding:"8px 8px"}}>
-        {NAV.filter(n=>!n.admin||user.role==="admin").map(n=>{
-          const a=page===n.id;
-          return(
-            <button key={n.id} onClick={()=>setPage(n.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,marginBottom:2,background:a?`${C.pink}18`:"transparent",border:a?`1px solid ${C.pink}33`:"1px solid transparent",cursor:"pointer",fontFamily:"Cairo",transition:"all .15s",color:a?C.pink:C.textS,fontSize:12.5,fontWeight:a?600:400,textAlign:"right"}}
-              onMouseEnter={e=>{if(!a)e.currentTarget.style.background="rgba(255,255,255,0.04)"}}
-              onMouseLeave={e=>{if(!a)e.currentTarget.style.background="transparent"}}>
-              <span style={{fontSize:14}}>{n.icon}</span>{n.label}
-              {n.id==="followup"&&unread>0&&<span style={{marginRight:"auto",background:C.pink,color:"white",fontSize:9,fontWeight:700,borderRadius:10,padding:"2px 6px"}}>{unread}</span>}
-            </button>
-          );
-        })}
-      </nav>
-      <div style={{padding:12,borderTop:`1px solid ${C.border}`,flexShrink:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-          <Av text={user.avatar} color={RC[user.role]} size={34}/>
-          <div style={{flex:1,minWidth:0}}><div style={{color:C.text,fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.name}</div><div style={{color:RC[user.role],fontSize:10,fontWeight:500}}>{RL[user.role]}</div></div>
-        </div>
-        <button onClick={onLogout} style={{width:"100%",padding:"7px",borderRadius:9,fontFamily:"Cairo",background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:12,fontWeight:600,cursor:"pointer"}}>تسجيل الخروج</button>
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -2610,25 +2686,12 @@ export default function App(){
     }).catch((err) => console.error("Failed to load supabase-js:", err));
   }, []);
 
-  // ─── CREATIVE MODULE — الجوجل شيت هو قاعدة البيانات، مباشرة، من غير Supabase ─
-  const CREATIVE_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/creative-sheet-api";
-  const CREATIVE_API_SECRET = "wameed-creative-9f3a7b2e1d8c4f6a";
-  const creativeUrl = () => `${CREATIVE_API}?secret=${encodeURIComponent(CREATIVE_API_SECRET)}`;
-  const loadCreativeFromSheet = async () => {
-    try {
-      const res = await fetch(creativeUrl());
-      const data = await res.json();
-      if (data?.tasks) { setCreativeTasksRaw(data.tasks); ls.set("w_creative", data.tasks); }
-    } catch(e) { console.error("Failed to load creative tasks from sheet:", e); }
-  };
-  useEffect(() => { if (page === "creative") loadCreativeFromSheet(); }, [page]);
-
   const loadFromDB = async () => {
     if (!window.__SB) return;
     try {
       const [
         {data:dU}, {data:dC}, {data:dF}, {data:dCa},
-        {data:dT}, {data:dS}, {data:dP}
+        {data:dT}, {data:dS}, {data:dP}, {data:dCr}
       ] = await Promise.all([
         window.__SB.from("users").select("*"),
         window.__SB.from("clients").select("*"),
@@ -2637,6 +2700,7 @@ export default function App(){
         window.__SB.from("tasks").select("*"),
         window.__SB.from("satisfaction").select("*"),
         window.__SB.from("payroll").select("*"),
+        window.__SB.from("creative_tasks").select("*").order("created_at",{ascending:false}),
       ]);
       if(dU?.length) {
         const v=dU.map(u=>({...u,avatar:u.avatar||ini(u.name)}));
@@ -2652,7 +2716,7 @@ export default function App(){
       if(dT?.length) { const v=dT.map(t=>({...t,assignedTo:t.assigned_to,clientId:t.client_id,due:t.due_date})); setTasksRaw(v); ls.set("w_tasks",v); }
       if(dS?.length) { const v=dS.map(s=>({...s,clientId:s.client_id,score:s.score_overall,roas:s.score_roas,speed:s.score_speed,reports:s.score_reports})); setSatisfactionRaw(v); ls.set("w_satisfaction",v); }
       if(dP?.length) { const v=dP.map(p=>({...p,userId:p.user_id,base:p.base_salary})); setPayrollRaw(v); ls.set("w_payroll",v); }
-      // creative_tasks بقى بيتقرا من الجوجل شيت مباشرة (loadCreativeFromSheet)، مش من هنا.
+      if(dCr?.length) { const v=dCr.map(t=>({...t,clientId:t.client_id,clientName:t.client_name,designerId:t.designer_id,designerName:t.designer_name,taskDate:t.task_date,deadLine:t.dead_line,strategyLink:t.strategy_link,websiteLink:t.website_link,noOfSizes:t.no_of_sizes,uploadFolder:t.upload_folder,uploadDate:t.upload_date,directorApproved:t.director_approved,timeNote:t.time_note})); setCreativeTasksRaw(v); ls.set("w_creative",v); }
       setDbReady(true);
     } catch(e) { console.log("DB error:", e); }
   };
@@ -2755,24 +2819,29 @@ export default function App(){
     />,
     creative: <CreativeTasks
       tasks={creativeTasks}
-      setTasks={async (fn) => {
+      setTasks={(fn) => {
         const prev = creativeTasks;
         const next = typeof fn === "function" ? fn(prev) : fn;
-        const opts = { headers: {"Content-Type":"application/json"} };
-        try{
-          if (next.length > prev.length) {
-            const t = next[next.length-1];
-            await fetch(creativeUrl(), {...opts, method:"POST", body: JSON.stringify(t)});
-          } else if (next.length < prev.length) {
-            const removed = prev.find(t => !next.find(x => x.id === t.id));
-            if (removed) await fetch(creativeUrl(), {...opts, method:"DELETE", body: JSON.stringify({id: removed.id})});
-          } else {
-            const changed = next.find((t,i) => JSON.stringify(t) !== JSON.stringify(prev[i]));
-            if (changed) await fetch(creativeUrl(), {...opts, method:"PUT", body: JSON.stringify(changed)});
-          }
-        }catch(e){ console.error("Creative sheet sync failed:", e); }
+        const toRow = (t) => ({
+          agency:t.agency, department:t.department, strategy_link:t.strategyLink,
+          client_id:t.clientId||null, client_name:t.clientName, website_link:t.websiteLink,
+          task_date:t.taskDate, notes:t.notes, dead_line:t.deadLine,
+          designer_id:t.designerId||null, designer_name:t.designerName, forum:t.forum,
+          no_of_sizes:t.noOfSizes, size:t.size, status:t.status,
+          upload_folder:t.uploadFolder, upload_date:t.uploadDate||null,
+          done:t.done, director_approved:t.directorApproved, time_note:t.timeNote,
+        });
+        if (next.length > prev.length) {
+          const t = next[next.length-1];
+          save("creative_tasks", toRow(t));
+        } else if (next.length < prev.length) {
+          const removed = prev.find(t => !next.find(x => x.id === t.id));
+          if (removed) del("creative_tasks", {id: removed.id});
+        } else {
+          const changed = next.find((t,i) => JSON.stringify(t) !== JSON.stringify(prev[i]));
+          if (changed) update("creative_tasks", toRow(changed), {id:changed.id});
+        }
         setCreativeTasks(next);
-        loadCreativeFromSheet();
       }}
       clients={clients} users={users} currentUser={user}
     />,
@@ -2848,17 +2917,40 @@ export default function App(){
   return (
     <div style={{minHeight:"100vh", background:C.bg, fontFamily:"Cairo", direction:"rtl", display:"flex"}}>
       <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
-      <Sidebar page={page} setPage={setPage} user={user} onLogout={() => setUser(null)} unread={unread}/>
-      <main style={{flex:1, marginRight:230, overflowY:"auto", minHeight:"100vh", paddingBottom:40}}>
+      <Sidebar page={page} setPage={setPage} user={user} onLogout={() => setUser(null)} unread={unread} users={users} setUsers={setUsers}/>
+      <main style={{flex:1, marginRight:230, overflowY:"auto", minHeight:"100vh", paddingBottom:40}} className="main-content">
         <div style={{position:"sticky",top:0,zIndex:50,background:`${C.bg}ee`,backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.border}`,padding:"9px 28px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span style={{fontSize:11,fontWeight:600,color:dbReady?C.green:C.orange}}>
-            {dbReady ? "● متصل بـ Supabase" : "● محفوظ محلياً — يتزامن مع Supabase تلقائياً"}
+            {dbReady ? "● متصل بـ Supabase" : "● محفوظ محلياً"}
           </span>
           <NotifBell notifs={notifs} setNotifs={setNotifs} userId={user.id}/>
         </div>
         {P[page] || P.dashboard}
       </main>
-      <style>{`*{box-sizing:border-box}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}select option{background:#0D1526}button:hover:not(:disabled){filter:brightness(1.07)}`}</style>
+      <style>{`
+        *{box-sizing:border-box}
+        ::-webkit-scrollbar{width:4px}
+        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+        select option{background:#0D1526}
+        button:hover:not(:disabled){filter:brightness(1.07)}
+        @media(max-width:768px){
+          .main-content{margin-right:0!important;padding-top:56px!important}
+          #main-sidebar{transform:translateX(100%)}
+          div[style*="grid-template-columns: repeat(4"]{grid-template-columns:repeat(2,1fr)!important}
+          div[style*="grid-template-columns: repeat(3"]{grid-template-columns:repeat(2,1fr)!important}
+          div[style*="padding: \"0 32px\""]{padding:0 16px!important}
+          div[style*="padding:\"0 32px\""]{padding:0 16px!important}
+          h1{font-size:18px!important}
+          table{font-size:12px!important}
+          th,td{padding:8px!important}
+        }
+        @media(max-width:480px){
+          div[style*="grid-template-columns: repeat(4"]{grid-template-columns:1fr!important}
+          div[style*="grid-template-columns: repeat(3"]{grid-template-columns:1fr!important}
+          div[style*="grid-template-columns: repeat(2"]{grid-template-columns:1fr!important}
+          div[style*="grid-template-columns: 1fr 1fr"]{grid-template-columns:1fr!important}
+        }
+      `}</style>
     </div>
   );
 }
