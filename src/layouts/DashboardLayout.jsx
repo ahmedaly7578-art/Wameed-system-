@@ -24,6 +24,7 @@ export default function DashboardLayout() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const [notifOpen, setNotifOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const handleLogout = async () => {
     await signOut()
@@ -34,19 +35,41 @@ export default function DashboardLayout() {
 
   return (
     <div className="flex min-h-screen font-cairo" dir="rtl">
+      {/* Mobile top bar */}
+      <div className="md:hidden fixed top-0 right-0 left-0 h-14 flex items-center justify-between px-4 z-40"
+        style={{ background: COLORS.bgCard, borderBottom: `1px solid ${COLORS.border}` }}>
+        <WameedLogo size={20} />
+        <button onClick={() => setSidebarOpen(true)}
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-lg cursor-pointer"
+          style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${COLORS.border}`, color: COLORS.text }}>
+          ☰
+        </button>
+      </div>
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div className="md:hidden fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* Sidebar */}
-      <aside className="fixed right-0 top-0 h-screen flex flex-col overflow-y-auto z-50"
+      <aside className={`fixed right-0 top-0 h-screen flex flex-col overflow-y-auto z-50 transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0`}
         style={{ width: 230, background: COLORS.bgCard, borderLeft: `1px solid ${COLORS.border}` }}>
 
         {/* Logo */}
-        <div className="px-5 py-5 flex-shrink-0" style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+        <div className="px-5 py-5 flex-shrink-0 flex items-center justify-between" style={{ borderBottom: `1px solid ${COLORS.border}` }}>
           <WameedLogo size={24} />
+          <button onClick={() => setSidebarOpen(false)}
+            className="md:hidden w-7 h-7 rounded-lg flex items-center justify-center text-sm cursor-pointer"
+            style={{ background: 'rgba(255,255,255,0.05)', color: COLORS.textS }}>
+            ✕
+          </button>
         </div>
 
         {/* Nav */}
         <nav className="flex-1 p-2 space-y-0.5">
           {visibleNav.map(n => (
-            <NavLink key={n.to} to={n.to} end={n.exact}
+            <NavLink key={n.to} to={n.to} end={n.exact} onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm transition-all cursor-pointer w-full text-right
                 ${isActive
@@ -86,7 +109,7 @@ export default function DashboardLayout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto min-h-screen pb-10" style={{ marginRight: 230, background: COLORS.bg }}>
+      <main className="flex-1 overflow-y-auto min-h-screen pb-10 pt-14 md:pt-0 md:mr-[230px]" style={{ background: COLORS.bg }}>
         <Outlet />
       </main>
     </div>
