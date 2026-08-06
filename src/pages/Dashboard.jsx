@@ -64,9 +64,9 @@ export default function Dashboard() {
         </div>
       </PageHeader>
 
-      <div className="px-8 space-y-5">
+      <div className="px-4 md:px-8 space-y-5">
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           <StatCard label="العملاء النشطين" value={active.length} icon="👥" color={COLORS.pink} trend={12} sub={`${clients.filter(c => c.status === 'hold').length} موقوف`} />
           <StatCard label="إجمالي الإيرادات" value={`${(totalRev / 1000).toFixed(0)}k SAR`} icon="💰" color={COLORS.green} trend={5} />
           <StatCard label="متوسط ROAS" value={avgROAS} icon="📈" color={COLORS.purple} trend={8} />
@@ -75,7 +75,7 @@ export default function Dashboard() {
 
         {/* Alerts */}
         {(lateFollowup.length > 0 || lateTasks.length > 0) && (
-          <div className="grid gap-3" style={{ gridTemplateColumns: lateFollowup.length && lateTasks.length ? '1fr 1fr' : '1fr' }}>
+          <div className={`grid gap-3 grid-cols-1 ${lateFollowup.length && lateTasks.length ? 'md:grid-cols-2' : ''}`}>
             {lateFollowup.length > 0 && (
               <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
                 style={{ background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.2)' }}>
@@ -100,7 +100,7 @@ export default function Dashboard() {
         )}
 
         {/* Two columns */}
-        <div className="grid grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
           {/* Renewals */}
           <Card>
             <div className="flex justify-between items-center mb-4">
