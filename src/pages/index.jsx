@@ -5,8 +5,8 @@ function ComingSoon({ title, icon, desc }) {
   return (
     <div>
       <PageHeader title={title} />
-      <div className="px-8">
-        <Card className="text-center py-20">
+      <div className="px-4 md:px-8">
+        <Card className="text-center py-14 md:py-20">
           <div className="text-5xl mb-4">{icon}</div>
           <div className="text-base font-bold mb-2" style={{ color: COLORS.text }}>{title}</div>
           <div className="text-sm" style={{ color: COLORS.textS }}>{desc || 'هذه الصفحة جاهزة للبيانات الحقيقية من Supabase'}</div>
