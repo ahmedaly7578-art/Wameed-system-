@@ -224,12 +224,12 @@ export function Modal({ open, onClose, title, children, width = 520 }) {
 // ─── PAGE HEADER ─────────────────────────────────────────────────────────────
 export function PageHeader({ title, subtitle, children }) {
   return (
-    <div className="flex items-start justify-between mb-6 px-8 pt-6">
+    <div className="flex flex-wrap items-start justify-between gap-3 mb-6 px-4 md:px-8 pt-4 md:pt-6">
       <div>
         <h1 className="text-xl font-black mb-1" style={{ color: COLORS.text }}>{title}</h1>
         {subtitle && <p className="text-xs" style={{ color: COLORS.textS }}>{subtitle}</p>}
       </div>
-      {children && <div className="flex gap-2.5 items-center">{children}</div>}
+      {children && <div className="flex flex-wrap gap-2.5 items-center">{children}</div>}
     </div>
   )
 }
