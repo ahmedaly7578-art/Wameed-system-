@@ -1407,41 +1407,31 @@ function ClientFU({client,users,followups,setFollowups,addNotif,currentUser,onBa
 }
 
 // ═══ CREATIVE ═════════════════════════════════════════════════════════════════
+const FORUMS=["From-Scratch","Template","Edit","Re-use"];
+const CSTATUS={pending:"لسه ماتبدأش",in_progress:"جاري",review:"مراجعة",done:"تم",late:"متأخر"};
+const CSTATUS_C={pending:C.textS,in_progress:C.blue,review:C.orange,done:C.green,late:C.red};
 const dlDate=(taskDate)=>{if(!taskDate)return "";const d=new Date(taskDate);d.setDate(d.getDate()+4);return d.toISOString().split("T")[0];};
 
-// حقل بيبقى Select لو عندنا قايمة اختيارات جاية من الشيت، وإلا بيرجع Input عادي
-function DynField({label,value,onChange,options,placeholder,req,mb=0}){
-  if(options&&options.length>0){
-    return <Sel label={label} value={value} onChange={onChange} opts={options.map(o=>({v:o,l:o}))} ph={placeholder||"اختر..."} req={req} mb={mb}/>;
-  }
-  return <Inp label={label} value={value} onChange={onChange} placeholder={placeholder} req={req} mb={mb}/>;
-}
-
-function AddCreativeModal({open,onClose,onAdd,onSave,edit,clients,dropdowns}){
-  const dd=dropdowns||{};
-  const E={taskOwner:"",agency:"",department:"",strategyLink:"",clientId:"",clientName:"",websiteLink:"",taskDate:todayStr(),notes:"",deadLine:"",nO:"",member:"",forum:"",size:"",status:"",uploadFolder:"",done:false,directorApproved:false,timeNote:""};
+function AddCreativeModal({open,onClose,onAdd,onSave,edit,clients,users}){
+  const designers=users.filter(u=>u.role==="designer");
+  const E={agency:"",department:"",strategyLink:"",clientId:"",clientName:"",websiteLink:"",taskDate:todayStr(),notes:"",deadLine:"",designerId:"",designerName:"",forum:"From-Scratch",noOfSizes:"",size:"",status:"pending",uploadFolder:"",uploadDate:"",done:false,directorApproved:false,timeNote:""};
   const [f,setF]=useState(edit||E);const [err,setErr]=useState("");
   useEffect(()=>{setF(edit?{...E,...edit}:E)},[edit,open]);
   const s=(k,v)=>setF(p=>{const n={...p,[k]:v};if(k==="taskDate"&&!edit)n.deadLine=dlDate(v);return n;});
   const sub=()=>{
-    if(!f.agency.trim()&&!f.agency){setErr("أكمل الحقول المطلوبة (الأجنسي + تاريخ التاسك)");return;}
-    if(!f.taskDate){setErr("أكمل الحقول المطلوبة (الأجنسي + تاريخ التاسك)");return;}
-    const payload={...f,deadLine:f.deadLine||dlDate(f.taskDate),clientId:f.clientId?+f.clientId:null};
+    if(!f.agency.trim()||!f.taskDate){setErr("أكمل الحقول المطلوبة (الأجنسي + تاريخ التاسك)");return;}
+    const payload={...f,deadLine:f.deadLine||dlDate(f.taskDate),clientId:f.clientId?+f.clientId:null,designerId:f.designerId?+f.designerId:null};
     if(edit)onSave({...payload,id:edit.id});else onAdd({...payload,id:Date.now()});
     setErr("");onClose();
   };
   return(
     <Mdl open={open} onClose={onClose} title={edit?"✏️ تعديل تاسك كريتيف":"🎨 إضافة تاسك كريتيف"} width={620}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-        <DynField label="Task Owner" value={f.taskOwner} onChange={v=>s("taskOwner",v)} options={dd.taskOwner}/>
-        <DynField label="الأجنسي / Agency" value={f.agency} onChange={v=>s("agency",v)} options={dd.agency} req/>
+        <Inp label="الأجنسي / Agency" value={f.agency} onChange={v=>s("agency",v)} req mb={0} placeholder="Ataa"/>
+        <Inp label="الديبارتمنت" value={f.department} onChange={v=>s("department",v)} mb={0} placeholder="Social"/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
-        <DynField label="الديبارتمنت" value={f.department} onChange={v=>s("department",v)} options={dd.department}/>
-        <DynField label="Member" value={f.member} onChange={v=>s("member",v)} options={dd.member}/>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
-        <Sel label="العميل (من النظام)" value={f.clientId} onChange={v=>{s("clientId",v);const c=clients.find(x=>x.id===+v);if(c)s("clientName",c.name);}} opts={clients.map(c=>({v:c.id,l:c.name}))} ph="اختياري" mb={0}/>
+        <Sel label="العميل" value={f.clientId} onChange={v=>{s("clientId",v);const c=clients.find(x=>x.id===+v);if(c)s("clientName",c.name);}} opts={clients.map(c=>({v:c.id,l:c.name}))} ph="اختياري" mb={0}/>
         <Inp label="اسم العميل (لو مش موجود بالنظام)" value={f.clientName} onChange={v=>s("clientName",v)} mb={0}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
@@ -1450,27 +1440,33 @@ function AddCreativeModal({open,onClose,onAdd,onSave,edit,clients,dropdowns}){
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
         <Inp label="تاريخ التاسك" value={f.taskDate} onChange={v=>s("taskDate",v)} type="date" req mb={0}/>
-        <Inp label="الديدلاين (تلقائي: +4 أيام)" value={f.deadLine} onChange={v=>s("deadLine",v)} type="date" mb={0}/>
+        <div>
+          <Inp label="الديدلاين (تلقائي: +4 أيام)" value={f.deadLine} onChange={v=>s("deadLine",v)} type="date" mb={0}/>
+        </div>
       </div>
       <div style={{marginTop:12}}>
         <label style={{display:"block",fontSize:12,fontWeight:600,color:C.textS,marginBottom:6}}>Notes / Data</label>
         <textarea value={f.notes} onChange={e=>s("notes",e.target.value)} style={{width:"100%",padding:"10px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,outline:"none",fontFamily:"Cairo",boxSizing:"border-box",resize:"vertical",minHeight:60,direction:"rtl"}}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
-        <DynField label="Forum" value={f.forum} onChange={v=>s("forum",v)} options={dd.forum}/>
-        <DynField label="Size" value={f.size} onChange={v=>s("size",v)} options={dd.size}/>
+        <Sel label="المصمم" value={f.designerId} onChange={v=>{s("designerId",v);const d=designers.find(x=>x.id===+v);if(d)s("designerName",d.name);}} opts={designers.map(d=>({v:d.id,l:d.name}))} ph="اختر مصمم" mb={0}/>
+        <Sel label="Forum" value={f.forum} onChange={v=>s("forum",v)} opts={FORUMS.map(x=>({v:x,l:x}))} mb={0}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
-        <DynField label="الحالة" value={f.status} onChange={v=>s("status",v)} options={dd.status}/>
-        <Inp label="N.O" value={f.nO} onChange={v=>s("nO",v)} mb={0}/>
+        <Inp label="No of Sizes" value={f.noOfSizes} onChange={v=>s("noOfSizes",v)} mb={0} placeholder="2 Platforms"/>
+        <Inp label="Size" value={f.size} onChange={v=>s("size",v)} mb={0} placeholder="Snap+Insta"/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Sel label="الحالة" value={f.status} onChange={v=>s("status",v)} opts={Object.entries(CSTATUS).map(([v,l])=>({v,l}))} mb={0}/>
         <Inp label="Upload Folder" value={f.uploadFolder} onChange={v=>s("uploadFolder",v)} mb={0} placeholder="رابط الفولدر"/>
-        <DynField label="Time" value={f.timeNote} onChange={v=>s("timeNote",v)} options={dd.timeNote} placeholder="Same"/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Inp label="Upload Date" value={f.uploadDate} onChange={v=>s("uploadDate",v)} type="date" mb={0}/>
+        <Inp label="Time" value={f.timeNote} onChange={v=>s("timeNote",v)} mb={0} placeholder="Same"/>
       </div>
       <div style={{display:"flex",gap:20,marginTop:16}}>
         <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}><input type="checkbox" checked={f.done} onChange={e=>s("done",e.target.checked)}/><span style={{color:C.textS,fontSize:12}}>Done</span></label>
-        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}><input type="checkbox" checked={f.directorApproved} onChange={e=>s("directorApproved",e.target.checked)}/><span style={{color:C.textS,fontSize:12}}>Director</span></label>
+        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}><input type="checkbox" checked={f.directorApproved} onChange={e=>s("directorApproved",e.target.checked)}/><span style={{color:C.textS,fontSize:12}}>Director Approved</span></label>
       </div>
       {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginTop:14,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
       <div style={{display:"flex",gap:10,marginTop:16}}>
@@ -1481,16 +1477,15 @@ function AddCreativeModal({open,onClose,onAdd,onSave,edit,clients,dropdowns}){
   );
 }
 
-function CreativeTasks({tasks,setTasks,clients,users,currentUser,dropdowns,refreshing}){
+function CreativeTasks({tasks,setTasks,clients,users,currentUser}){
   const [addOpen,setAddOpen]=useState(false);const [edit,setEdit]=useState(null);
-  const [filter,setFilter]=useState("all");const [filterMember,setFilterMember]=useState("all");
+  const [filter,setFilter]=useState("all");const [filterDesigner,setFilterDesigner]=useState("all");
+  const designers=users.filter(u=>u.role==="designer");
   const isLate=(t)=>!t.done&&t.deadLine&&new Date(t.deadLine)<new Date();
-  const members=[...new Set(tasks.map(t=>t.member).filter(Boolean))];
-  const statuses=[...new Set(tasks.map(t=>t.status).filter(Boolean))];
   const filtered=tasks.filter(t=>{
     if(filter==="late"&&!isLate(t))return false;
     if(filter!=="all"&&filter!=="late"&&t.status!==filter)return false;
-    if(filterMember!=="all"&&t.member!==filterMember)return false;
+    if(filterDesigner!=="all"&&t.designerId!==+filterDesigner)return false;
     return true;
   });
   const lateCount=tasks.filter(isLate).length;
@@ -1498,32 +1493,33 @@ function CreativeTasks({tasks,setTasks,clients,users,currentUser,dropdowns,refre
     <div>
       <AddCreativeModal open={addOpen||!!edit} onClose={()=>{setAddOpen(false);setEdit(null)}}
         onAdd={t=>setTasks(p=>[...p,t])} onSave={t=>setTasks(p=>p.map(x=>x.id===t.id?{...x,...t}:x))}
-        edit={edit} clients={clients} dropdowns={dropdowns}/>
-      <TB title="الكريتيف 🎨" sub={`${tasks.length} تاسك · ${lateCount} متأخر · ${refreshing?"بيتحدث من الشيت...":"متزامن مع Google Sheet"}`}>
+        edit={edit} clients={clients} users={users}/>
+      <TB title="الكريتيف 🎨" sub={`${tasks.length} تاسك · ${lateCount} متأخر · متزامن مع Google Sheet`}>
         <Btn onClick={()=>setAddOpen(true)}>+ تاسك جديد</Btn>
       </TB>
       <div style={{padding:"0 32px"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
           <StC label="إجمالي التاسكات" value={tasks.length} icon="🎨" color={C.purple}/>
+          <StC label="جاري" value={tasks.filter(t=>t.status==="in_progress").length} icon="🔄" color={C.blue}/>
           <StC label="تم" value={tasks.filter(t=>t.done).length} icon="✅" color={C.green}/>
-          <StC label="ديركتور موافق" value={tasks.filter(t=>t.directorApproved).length} icon="👑" color={C.blue}/>
           <StC label="متأخر (بعد 4 أيام)" value={lateCount} icon="🚨" color={C.red}/>
         </div>
         <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-          <button onClick={()=>setFilter("all")} style={{padding:"8px 14px",borderRadius:20,fontFamily:"Cairo",fontSize:12,cursor:"pointer",border:"1px solid",background:filter==="all"?`${C.pink}18`:C.bgCard,color:filter==="all"?C.pink:C.textS,borderColor:filter==="all"?`${C.pink}44`:C.border}}>الكل</button>
-          <button onClick={()=>setFilter("late")} style={{padding:"8px 14px",borderRadius:20,fontFamily:"Cairo",fontSize:12,cursor:"pointer",border:"1px solid",background:filter==="late"?`${C.red}18`:C.bgCard,color:filter==="late"?C.red:C.textS,borderColor:filter==="late"?`${C.red}44`:C.border}}>⚠️ متأخر</button>
-          {statuses.map(s=>(
-            <button key={s} onClick={()=>setFilter(s)} style={{padding:"8px 14px",borderRadius:20,fontFamily:"Cairo",fontSize:12,cursor:"pointer",border:"1px solid",background:filter===s?`${C.blue}18`:C.bgCard,color:filter===s?C.blue:C.textS,borderColor:filter===s?`${C.blue}44`:C.border}}>{s}</button>
+          {["all","pending","in_progress","review","done","late"].map(s=>(
+            <button key={s} onClick={()=>setFilter(s)} style={{padding:"8px 14px",borderRadius:20,fontFamily:"Cairo",fontSize:12,cursor:"pointer",border:"1px solid",background:filter===s?`${C.pink}18`:C.bgCard,color:filter===s?C.pink:C.textS,borderColor:filter===s?`${C.pink}44`:C.border}}>
+              {s==="all"?"الكل":s==="late"?"⚠️ متأخر":CSTATUS[s]}
+            </button>
           ))}
-          <select value={filterMember} onChange={e=>setFilterMember(e.target.value)} style={{padding:"8px 14px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none"}}>
-            <option value="all">كل الأعضاء</option>
-            {members.map(m=><option key={m} value={m}>{m}</option>)}
+          <select value={filterDesigner} onChange={e=>setFilterDesigner(e.target.value)} style={{padding:"8px 14px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none"}}>
+            <option value="all">كل المصممين</option>
+            {designers.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         </div>
         {filtered.length===0
           ?<Card s={{textAlign:"center",padding:"60px"}}><div style={{fontSize:40,marginBottom:12}}>🎨</div><div style={{color:C.textS,fontSize:14}}>لا توجد تاسكات بهذا الفلتر</div></Card>
           :filtered.map(t=>{
             const client=clients.find(c=>c.id===t.clientId);
+            const designer=users.find(u=>u.id===t.designerId);
             const late=isLate(t);
             return(<Card key={t.id} s={{marginBottom:10,padding:"14px 16px"}}>
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
@@ -1531,15 +1527,13 @@ function CreativeTasks({tasks,setTasks,clients,users,currentUser,dropdowns,refre
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
                     <span style={{color:C.text,fontSize:13,fontWeight:700}}>{t.agency}</span>
                     {t.department&&<Bdg label={t.department} color={C.purple} dot={false}/>}
-                    {t.status&&<Bdg label={t.status} color={C.blue}/>}
+                    <Bdg label={CSTATUS[t.status]||t.status} color={CSTATUS_C[t.status]||C.textS}/>
                     {late&&<Bdg label="متأخر ⚠️" color={C.red}/>}
                     {t.directorApproved&&<Bdg label="✓ Director" color={C.green} dot={false}/>}
-                    {t.done&&<Bdg label="✓ Done" color={C.green} dot={false}/>}
                   </div>
-                  <div style={{color:C.textS,fontSize:12,marginBottom:6}}>{client?.name||t.clientName||"—"} {t.forum?`· ${t.forum}`:""} {t.size?`· ${t.size}`:""}</div>
+                  <div style={{color:C.textS,fontSize:12,marginBottom:6}}>{client?.name||t.clientName||"—"} · {t.forum} {t.noOfSizes?`· ${t.noOfSizes}`:""} {t.size?`· ${t.size}`:""}</div>
                   <div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
-                    {t.member&&<span style={{color:C.textS,fontSize:11}}>👤 {t.member}</span>}
-                    {t.taskOwner&&<span style={{color:C.textM,fontSize:11}}>🧑‍💼 {t.taskOwner}</span>}
+                    {designer&&<div style={{display:"flex",alignItems:"center",gap:5}}><Av text={designer.avatar} color={RC.designer} size={20}/><span style={{color:C.textS,fontSize:11}}>{designer.name}</span></div>}
                     <span style={{color:C.textM,fontSize:11}}>🗓 نزل: {fmtDate(t.taskDate)}</span>
                     <span style={{color:late?C.red:C.textM,fontSize:11,fontWeight:late?700:400}}>⏰ ديدلاين: {fmtDate(t.deadLine)}</span>
                     {t.strategyLink&&<a href={t.strategyLink} target="_blank" rel="noreferrer" style={{color:C.blue,fontSize:11}}>Strategy ↗</a>}
@@ -1547,7 +1541,7 @@ function CreativeTasks({tasks,setTasks,clients,users,currentUser,dropdowns,refre
                   </div>
                 </div>
                 <div style={{display:"flex",gap:6,flexShrink:0}}>
-                  {!t.done&&<button onClick={()=>setTasks(p=>p.map(x=>x.id===t.id?{...x,done:true}:x))} style={{padding:"6px 12px",borderRadius:8,background:`${C.green}18`,border:`1px solid ${C.green}33`,color:C.green,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>✓ تم</button>}
+                  {!t.done&&<button onClick={()=>setTasks(p=>p.map(x=>x.id===t.id?{...x,done:true,status:"done"}:x))} style={{padding:"6px 12px",borderRadius:8,background:`${C.green}18`,border:`1px solid ${C.green}33`,color:C.green,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>✓ تم</button>}
                   <button onClick={()=>setEdit(t)} style={{padding:"6px 10px",borderRadius:8,background:`${C.purple}18`,border:`1px solid ${C.purple}33`,color:C.purple,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>✏️</button>
                   <button onClick={()=>{if(window.confirm("حذف التاسك؟"))setTasks(p=>p.filter(x=>x.id!==t.id));}} style={{padding:"6px 10px",borderRadius:8,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>
                 </div>
@@ -1559,7 +1553,6 @@ function CreativeTasks({tasks,setTasks,clients,users,currentUser,dropdowns,refre
     </div>
   );
 }
-
 
 // ═══ CAMPAIGNS ════════════════════════════════════════════════════════════════
 function AddCampaignModal({open,onClose,onAdd,clients,currentUser}){
@@ -2618,20 +2611,15 @@ export default function App(){
   }, []);
 
   // ─── CREATIVE MODULE — الجوجل شيت هو قاعدة البيانات، مباشرة، من غير Supabase ─
-  const CREATIVE_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/creative-sheet-api-";
+  const CREATIVE_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/creative-sheet-api";
   const CREATIVE_API_SECRET = "wameed-creative-9f3a7b2e1d8c4f6a";
   const creativeUrl = () => `${CREATIVE_API}?secret=${encodeURIComponent(CREATIVE_API_SECRET)}`;
-  const [creativeDropdowns, setCreativeDropdowns] = useState({});
-  const [creativeRefreshing, setCreativeRefreshing] = useState(false);
   const loadCreativeFromSheet = async () => {
-    setCreativeRefreshing(true);
     try {
       const res = await fetch(creativeUrl());
       const data = await res.json();
       if (data?.tasks) { setCreativeTasksRaw(data.tasks); ls.set("w_creative", data.tasks); }
-      if (data?.dropdowns) setCreativeDropdowns(data.dropdowns);
     } catch(e) { console.error("Failed to load creative tasks from sheet:", e); }
-    setCreativeRefreshing(false);
   };
   useEffect(() => { if (page === "creative") loadCreativeFromSheet(); }, [page]);
 
@@ -2692,20 +2680,20 @@ export default function App(){
     creativeTasks.filter(t => !t.done).forEach(t => {
       if (!t.deadLine || new Date(t.deadLine) >= new Date()) return;
       if (notifs.find(n => n.type === "creative_late" && n.creativeId === t.id)) return;
-      const member = t.member && users.find(u => u.name === t.member || u.name.includes(t.member) || t.member.includes(u.name));
+      const designer = users.find(u => u.id === t.designerId);
       addNotif({
         type: "creative_late",
         creativeId: t.id,
         title: "⚠️ تاسك كريتيف متأخر",
-        body: `${t.agency}${t.member ? " — " + t.member : ""} — تجاوز الديدلاين (${fmtDate(t.deadLine)})`,
+        body: `${t.agency}${designer ? " — " + designer.name : ""} — تجاوز الديدلاين (${fmtDate(t.deadLine)})`,
         userId: 1,
       });
-      if (member) addNotif({
+      if (designer) addNotif({
         type: "creative_late",
         creativeId: t.id,
         title: "⚠️ عندك تاسك متأخر",
         body: `${t.agency} — كان لازم يتسلم بتاريخ ${fmtDate(t.deadLine)}`,
-        userId: member.id,
+        userId: designer.id,
       });
     });
   }, [creativeTasks]);
@@ -2786,7 +2774,7 @@ export default function App(){
         setCreativeTasks(next);
         loadCreativeFromSheet();
       }}
-      clients={clients} users={users} currentUser={user} dropdowns={creativeDropdowns} refreshing={creativeRefreshing}
+      clients={clients} users={users} currentUser={user}
     />,
     campaigns: <Campaigns
       campaigns={campaigns}
