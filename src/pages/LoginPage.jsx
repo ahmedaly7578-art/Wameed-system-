@@ -44,9 +44,9 @@ export default function LoginPage() {
       <div className="absolute pointer-events-none" style={{ width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(123,111,224,0.10) 0%, transparent 70%)', top: -200, right: -100 }} />
       <div className="absolute pointer-events-none" style={{ width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(232,121,160,0.08) 0%, transparent 70%)', bottom: -150, left: 0 }} />
 
-      <div className="flex w-full max-w-[900px] min-h-screen">
+      <div className="flex flex-col md:flex-row w-full max-w-[900px] min-h-screen">
         {/* Left: Brand */}
-        <div className="flex-1 flex flex-col items-center justify-center px-16"
+        <div className="hidden md:flex flex-1 flex-col items-center justify-center px-8 lg:px-16"
           style={{ borderLeft: `1px solid ${COLORS.border}`, background: 'rgba(13,21,38,0.5)' }}>
 
           <div className="text-center mb-12">
@@ -88,9 +88,27 @@ export default function LoginPage() {
         </div>
 
         {/* Right: Form */}
-        <div className="w-[420px] flex flex-col items-center justify-center px-12">
-          <div className={`w-full ${shake ? 'animate-shake' : ''}`}
+        <div className="w-full md:w-[420px] flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-10 md:py-0">
+          <div className={`w-full max-w-sm md:max-w-none ${shake ? 'animate-shake' : ''}`}
             style={{ animation: shake ? 'shake 0.5s ease' : 'none' }}>
+
+            {/* Mobile-only compact logo */}
+            <div className="flex md:hidden items-center justify-center gap-2.5 mb-8">
+              <svg width={40} height={40} viewBox="0 0 60 60" fill="none">
+                <defs>
+                  <linearGradient id="lgMobile" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#E879A0" /><stop offset="100%" stopColor="#7B6FE0" />
+                  </linearGradient>
+                </defs>
+                <path d="M30 2 L36 22 L56 22 L40 35 L46 55 L30 43 L14 55 L20 35 L4 22 L24 22 Z" fill="url(#lgMobile)" />
+              </svg>
+              <div>
+                <div className="text-white font-black leading-none" style={{ fontSize: 24 }}>وميض</div>
+                <div className="font-bold" style={{ fontSize: 9, letterSpacing: '0.4em', background: COLORS.grad, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  WAMEED
+                </div>
+              </div>
+            </div>
 
             <div className="mb-8">
               <div className="font-black mb-1.5 text-white" style={{ fontSize: 24 }}>تسجيل الدخول</div>
