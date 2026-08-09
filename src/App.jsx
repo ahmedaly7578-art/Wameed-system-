@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 
 const C={bg:"#070E1F",bgCard:"#0D1526",bgHover:"#111E35",bgModal:"#0A1220",border:"rgba(255,255,255,0.07)",borderH:"rgba(255,255,255,0.14)",text:"#F1F5FF",textS:"rgba(255,255,255,0.5)",textM:"rgba(255,255,255,0.25)",pink:"#E879A0",purple:"#7B6FE0",green:"#34D399",blue:"#60A5FA",orange:"#F59E0B",red:"#F87171",teal:"#2DD4BF",grad:"linear-gradient(135deg,#E879A0 0%,#7B6FE0 100%)"};
 const RC={admin:C.pink,media_buyer:C.purple,social_media:C.green,account_manager:C.blue,designer:C.teal};
@@ -94,8 +94,10 @@ const Bdg=({label,color,dot=true})=>(
     {label}
   </span>
 );
-const Av=({text,color,size=36})=>(
-  <div style={{width:size,height:size,borderRadius:"50%",flexShrink:0,background:`${color}22`,border:`1.5px solid ${color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*.29,fontWeight:700,color}}>{text}</div>
+const Av=({text,color,size=36,img})=>(
+  img?
+  <img src={img} style={{width:size,height:size,borderRadius:"50%",flexShrink:0,objectFit:"cover",border:`1.5px solid ${color}55`}}/>
+  :<div style={{width:size,height:size,borderRadius:"50%",flexShrink:0,background:`${color}22`,border:`1.5px solid ${color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*.29,fontWeight:700,color}}>{text}</div>
 );
 const PT=({name})=>(
   <span style={{fontSize:10,padding:"2px 8px",borderRadius:6,fontWeight:600,background:`${PC[name]||C.purple}22`,color:PC[name]||C.purple,border:`1px solid ${PC[name]||C.purple}33`,whiteSpace:"nowrap"}}>{name}</span>
@@ -159,6 +161,8 @@ const NAV=[
   {id:"capacity",icon:"⚡",label:"Capacity"},
   {id:"followup",icon:"📌",label:"المتابعات"},
   {id:"creative",icon:"🎨",label:"الكريتيف"},
+  {id:"motion",icon:"🎬",label:"الموشن"},
+  {id:"media-renewals",icon:"🔁",label:"تجديدات الميديا",mediaOnly:true},
   {id:"campaigns",icon:"📊",label:"الحملات"},
   {id:"ai",icon:"🤖",label:"AI تحليل"},
   {id:"tasks",icon:"✅",label:"المهام"},
@@ -171,7 +175,78 @@ const NAV=[
   {id:"team",icon:"🧑‍💼",label:"إدارة الفريق",admin:true},
 ];
 
-function Sidebar({page,setPage,user,onLogout,unread}){
+// ═══ AVATAR UPLOAD ════════════════════════════════════════════════════════════
+const AVATAR_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/avatar-upload";
+const AVATAR_API_SECRET = "wameed-avatar-4d9f2c7b1e5a8036";
+
+function EditAvatarModal({open,onClose,currentUser,onSaved}){
+  const [preview,setPreview]=useState(currentUser?.avatarUrl||"");
+  const [file,setFile]=useState(null);
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState("");
+  useEffect(()=>{ if(open){ setPreview(currentUser?.avatarUrl||""); setFile(null); setErr(""); } },[open,currentUser]);
+
+  const pick=e=>{
+    const f=e.target.files?.[0];
+    if(!f) return;
+    if(!f.type.startsWith("image/")){ setErr("لازم تختار صورة"); return; }
+    if(f.size>5*1024*1024){ setErr("الصورة أكبر من 5 ميجا"); return; }
+    setErr("");
+    setFile(f);
+    const reader=new FileReader();
+    reader.onload=()=>setPreview(reader.result);
+    reader.readAsDataURL(f);
+  };
+
+  const save=async()=>{
+    if(!file){ onClose(); return; }
+    setBusy(true); setErr("");
+    try{
+      const b64=await new Promise((res,rej)=>{
+        const reader=new FileReader();
+        reader.onload=()=>res(reader.result);
+        reader.onerror=rej;
+        reader.readAsDataURL(file);
+      });
+      const ext=(file.type.split("/")[1]||"png").replace("jpeg","jpg");
+      const res=await fetch(`${AVATAR_API}?secret=${encodeURIComponent(AVATAR_API_SECRET)}`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({userId:currentUser.id, imageBase64:b64, fileExt:ext}),
+      });
+      const data=await res.json();
+      if(!res.ok||!data.url) throw new Error(data.error||"فشل الرفع");
+      onSaved(data.url);
+      onClose();
+    }catch(e){
+      setErr("حصل خطأ في رفع الصورة، حاول تاني");
+      console.error(e);
+    }finally{ setBusy(false); }
+  };
+
+  return(
+    <Mdl open={open} onClose={onClose} title="📷 صورتي الشخصية" width={380}>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14}}>
+        {preview
+          ? <img src={preview} style={{width:110,height:110,borderRadius:"50%",objectFit:"cover",border:`2px solid ${C.pink}55`}}/>
+          : <div style={{width:110,height:110,borderRadius:"50%",background:`${C.pink}18`,border:`2px dashed ${C.pink}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:30}}>{currentUser?.avatar||"👤"}</div>
+        }
+        <label style={{padding:"9px 18px",borderRadius:10,background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,color:C.textS,fontSize:12,fontFamily:"Cairo",cursor:"pointer"}}>
+          اختر صورة
+          <input type="file" accept="image/*" onChange={pick} style={{display:"none"}}/>
+        </label>
+        {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"8px 12px",color:"#FCA5A5",fontSize:12,width:"100%",textAlign:"center"}}>⚠️ {err}</div>}
+        <div style={{display:"flex",gap:10,width:"100%",marginTop:6}}>
+          <Btn onClick={save} style={{flex:1,padding:12}}>{busy?"...جاري الرفع":"✓ حفظ"}</Btn>
+          <button onClick={onClose} disabled={busy} style={{padding:"11px 18px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:12,color:C.textS,fontSize:13,fontFamily:"Cairo",cursor:"pointer"}}>إلغاء</button>
+        </div>
+      </div>
+    </Mdl>
+  );
+}
+
+function Sidebar({page,setPage,user,onLogout,unread,onAvatarSaved}){
+  const [editAvatar,setEditAvatar]=useState(false);
   return(
     <div style={{width:230,background:C.bgCard,borderLeft:`1px solid ${C.border}`,display:"flex",flexDirection:"column",height:"100vh",position:"fixed",right:0,top:0,zIndex:100,overflowY:"auto"}}>
       <div style={{padding:"20px 20px 16px",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
@@ -181,7 +256,7 @@ function Sidebar({page,setPage,user,onLogout,unread}){
         </div>
       </div>
       <nav style={{flex:1,padding:"8px 8px"}}>
-        {NAV.filter(n=>!n.admin||user.role==="admin").map(n=>{
+        {NAV.filter(n=>(!n.admin||user.role==="admin")&&(!n.mediaOnly||user.role==="admin"||user.role==="media_buyer")).map(n=>{
           const a=page===n.id;
           return(
             <button key={n.id} onClick={()=>setPage(n.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,marginBottom:2,background:a?`${C.pink}18`:"transparent",border:a?`1px solid ${C.pink}33`:"1px solid transparent",cursor:"pointer",fontFamily:"Cairo",transition:"all .15s",color:a?C.pink:C.textS,fontSize:12.5,fontWeight:a?600:400,textAlign:"right"}}
@@ -194,8 +269,12 @@ function Sidebar({page,setPage,user,onLogout,unread}){
         })}
       </nav>
       <div style={{padding:12,borderTop:`1px solid ${C.border}`,flexShrink:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-          <Av text={user.avatar} color={RC[user.role]} size={34}/>
+        <EditAvatarModal open={editAvatar} onClose={()=>setEditAvatar(false)} currentUser={user} onSaved={onAvatarSaved}/>
+        <div onClick={()=>setEditAvatar(true)} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,cursor:"pointer"}} title="تعديل صورتي">
+          <div style={{position:"relative"}}>
+            <Av text={user.avatar} img={user.avatarUrl} color={RC[user.role]} size={34}/>
+            <div style={{position:"absolute",bottom:-2,left:-2,width:15,height:15,borderRadius:"50%",background:C.bgCard,border:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8}}>📷</div>
+          </div>
           <div style={{flex:1,minWidth:0}}><div style={{color:C.text,fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.name}</div><div style={{color:RC[user.role],fontSize:10,fontWeight:500}}>{RL[user.role]}</div></div>
         </div>
         <button onClick={onLogout} style={{width:"100%",padding:"7px",borderRadius:9,fontFamily:"Cairo",background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:12,fontWeight:600,cursor:"pointer"}}>تسجيل الخروج</button>
@@ -247,7 +326,7 @@ function Dashboard({clients,users,notifs,followups,tasks}){
               const mc=clients.filter(c=>c.mb===m.id&&c.status==="active");
               const r=mc.length?(mc.reduce((s,c)=>s+c.roas,0)/mc.length).toFixed(1):0;
               return(<div key={m.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                <Av text={m.avatar} color={RC.media_buyer} size={30}/>
+                <Av text={m.avatar} img={m.avatarUrl} color={RC.media_buyer} size={30}/>
                 <div style={{flex:1}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,color:C.text,fontWeight:600}}>{m.name}</span><span style={{fontSize:12,color:r>=3?C.green:C.orange,fontWeight:700}}>ROAS {r}</span></div>
                   <div style={{height:5,background:"rgba(255,255,255,0.07)",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(100,r*20)}%`,background:r>=3?C.green:C.orange,borderRadius:3}}/></div>
@@ -286,7 +365,7 @@ function Dashboard({clients,users,notifs,followups,tasks}){
             {users.filter(u=>u.role==="media_buyer").map(m=>{
               const ac=clients.filter(c=>c.mb===m.id&&c.status==="active").length;const p=pct(ac,10);
               return(<div key={m.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-                <Av text={m.avatar} color={RC.media_buyer} size={28}/>
+                <Av text={m.avatar} img={m.avatarUrl} color={RC.media_buyer} size={28}/>
                 <div style={{flex:1}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:11,color:C.textS}}>{m.name}</span><span style={{fontSize:11,color:capC(p),fontWeight:700}}>{ac}/10</span></div>
                   <div style={{height:5,background:"rgba(255,255,255,0.07)",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${p}%`,background:capC(p),borderRadius:3}}/></div>
@@ -534,7 +613,7 @@ function Targets({clients,campaigns,users,targets,setTargets}){
             <Card key={m.id} s={{marginBottom:16}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
                 <div style={{display:"flex",alignItems:"center",gap:12}}>
-                  <Av text={m.avatar} color={RC.media_buyer} size={46}/>
+                  <Av text={m.avatar} img={m.avatarUrl} color={RC.media_buyer} size={46}/>
                   <div><div style={{color:C.text,fontSize:15,fontWeight:700}}>{m.name}</div><Bdg label="Media Buyer" color={RC.media_buyer}/></div>
                 </div>
                 <Btn onClick={()=>{setEditUser(m);const t=targets.find(x=>x.userId===m.id&&x.month==="2025-05");if(t)setF({targetClients:t.targetClients,targetRoas:t.targetRoas,targetUpsell:t.targetUpsell,targetRenewal:t.targetRenewal});setEditOpen(true)}} color={`${C.purple}33`} style={{color:C.purple,fontSize:12}}>✏️ تعديل الأهداف</Btn>
@@ -585,7 +664,7 @@ function Scorecard({clients,campaigns,tasks,users}){
           {scored.slice(0,3).map((u,i)=>(
             <Card key={u.id} s={{textAlign:"center",border:`1px solid ${medalColor(i)}44`}}>
               <div style={{fontSize:28,marginBottom:8}}>{i===0?"🥇":i===1?"🥈":"🥉"}</div>
-              <Av text={u.avatar} color={RC[u.role]} size={52} /><div style={{marginTop:0}}/>
+              <Av text={u.avatar} img={u.avatarUrl} color={RC[u.role]} size={52} /><div style={{marginTop:0}}/>
               <div style={{color:C.text,fontSize:15,fontWeight:700,marginTop:10,marginBottom:4}}>{u.name}</div>
               <Bdg label={RL[u.role]} color={RC[u.role]}/>
               <div style={{color:medalColor(i),fontSize:32,fontWeight:900,margin:"12px 0 4px"}}>{u.score.total}</div>
@@ -601,7 +680,7 @@ function Scorecard({clients,campaigns,tasks,users}){
               const gradeC=s.total>=80?C.green:s.total>=60?C.blue:s.total>=40?C.orange:C.red;
               return(<tr key={u.id} style={{borderBottom:`1px solid ${C.border}`}} onMouseEnter={e=>e.currentTarget.style.background=C.bgHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <td style={{padding:"13px 16px",color:medalColor(i),fontSize:16,fontWeight:700}}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</td>
-                <td style={{padding:"13px 16px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><Av text={u.avatar} color={RC[u.role]} size={30}/><div><div style={{color:C.text,fontSize:13,fontWeight:600}}>{u.name}</div><div style={{color:RC[u.role],fontSize:10}}>{RL[u.role]}</div></div></div></td>
+                <td style={{padding:"13px 16px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><Av text={u.avatar} img={u.avatarUrl} color={RC[u.role]} size={30}/><div><div style={{color:C.text,fontSize:13,fontWeight:600}}>{u.name}</div><div style={{color:RC[u.role],fontSize:10}}>{RL[u.role]}</div></div></div></td>
                 <td style={{padding:"13px 16px"}}><div><div style={{color:C.text,fontSize:13,fontWeight:700}}>{s.roasScore}/40</div><div style={{color:C.textM,fontSize:10}}>ROAS {s.avgR}</div></div></td>
                 <td style={{padding:"13px 16px"}}><div><div style={{color:C.text,fontSize:13,fontWeight:700}}>{s.clientScore}/30</div><div style={{color:C.textM,fontSize:10}}>{s.clients} عميل</div></div></td>
                 <td style={{padding:"13px 16px"}}><div><div style={{color:C.text,fontSize:13,fontWeight:700}}>{s.taskScore}/30</div><div style={{color:C.textM,fontSize:10}}>{s.done} منجزة · {s.late} متأخرة</div></div></td>
@@ -1264,7 +1343,7 @@ function Capacity({clients,users}){
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:22}}>
           {mbs.map(m=>{const ac=clients.filter(c=>c.mb===m.id&&c.status==="active").length;const hold=clients.filter(c=>c.mb===m.id&&c.status==="hold").length;const p=pct(ac,10);const cp=capC(p);const myC=clients.filter(c=>c.mb===m.id&&c.status==="active");
             return(<Card key={m.id}>
-              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}><Av text={m.avatar} color={RC.media_buyer} size={44}/><div style={{flex:1}}><div style={{color:C.text,fontSize:14,fontWeight:700}}>{m.name}</div><Bdg label="Media Buyer" color={RC.media_buyer}/></div><div style={{textAlign:"center"}}><div style={{color:cp,fontSize:22,fontWeight:800,lineHeight:1}}>{p}%</div><div style={{color:C.textM,fontSize:10}}>ممتلئ</div></div></div>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}><Av text={m.avatar} img={m.avatarUrl} color={RC.media_buyer} size={44}/><div style={{flex:1}}><div style={{color:C.text,fontSize:14,fontWeight:700}}>{m.name}</div><Bdg label="Media Buyer" color={RC.media_buyer}/></div><div style={{textAlign:"center"}}><div style={{color:cp,fontSize:22,fontWeight:800,lineHeight:1}}>{p}%</div><div style={{color:C.textM,fontSize:10}}>ممتلئ</div></div></div>
               <div style={{height:10,background:"rgba(255,255,255,0.07)",borderRadius:5,overflow:"hidden",marginBottom:12}}><div style={{height:"100%",width:`${p}%`,background:cp,borderRadius:5}}/></div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>{[["نشط",ac,C.green],["هولد",hold,C.orange],["الحد",10,C.textS]].map(([l,v,co])=><div key={l} style={{textAlign:"center",padding:"8px 4px",background:"rgba(255,255,255,0.03)",borderRadius:8}}><div style={{color:co,fontSize:18,fontWeight:800}}>{v}</div><div style={{color:C.textM,fontSize:10}}>{l}</div></div>)}</div>
               <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10}}><div style={{color:C.textM,fontSize:11,marginBottom:6}}>العملاء الحاليين</div>{myC.slice(0,3).map(c=><div key={c.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:`1px solid rgba(255,255,255,0.04)`}}><span style={{color:C.textS,fontSize:11}}>{c.name}</span><span style={{color:c.roas>=3?C.green:C.orange,fontSize:11,fontWeight:700}}>ROAS {c.roas}</span></div>)}{myC.length===0&&<div style={{color:C.textM,fontSize:11}}>لا يوجد عملاء</div>}</div>
@@ -1276,7 +1355,7 @@ function Capacity({clients,users}){
             <div key={role}>
               <div style={{color:C.textS,fontSize:11,fontWeight:600,marginBottom:10,textTransform:"uppercase",letterSpacing:".06em"}}>{title}</div>
               {list.map(m=>{const ac=clients.filter(c=>c.sm===m.id||c.am===m.id).length;const p=pct(ac,MAX[role]);return(
-                <Card key={m.id} s={{marginBottom:10}}><div style={{display:"flex",alignItems:"center",gap:12}}><Av text={m.avatar} color={RC[m.role]} size={40}/><div style={{flex:1}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{color:C.text,fontSize:13,fontWeight:600}}>{m.name}</span><span style={{color:capC(p),fontSize:13,fontWeight:700}}>{ac}/{MAX[role]}</span></div><div style={{height:6,background:"rgba(255,255,255,0.07)",borderRadius:3}}><div style={{height:"100%",width:`${p}%`,background:capC(p),borderRadius:3}}/></div></div></div></Card>
+                <Card key={m.id} s={{marginBottom:10}}><div style={{display:"flex",alignItems:"center",gap:12}}><Av text={m.avatar} img={m.avatarUrl} color={RC[m.role]} size={40}/><div style={{flex:1}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{color:C.text,fontSize:13,fontWeight:600}}>{m.name}</span><span style={{color:capC(p),fontSize:13,fontWeight:700}}>{ac}/{MAX[role]}</span></div><div style={{height:6,background:"rgba(255,255,255,0.07)",borderRadius:3}}><div style={{height:"100%",width:`${p}%`,background:capC(p),borderRadius:3}}/></div></div></div></Card>
               );})}
             </div>
           ))}
@@ -1325,8 +1404,8 @@ function FollowUp({clients,users,followups,setFollowups,addNotif,currentUser}){
                 <div style={{textAlign:"center",background:`${lc(days)}15`,border:`1px solid ${lc(days)}33`,borderRadius:10,padding:"6px 10px"}}><div style={{color:lc(days),fontSize:12,fontWeight:800}}>{ll(days)}</div></div>
               </div>
               <div style={{display:"flex",gap:8,marginBottom:10}}>
-                {mb&&<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.03)",borderRadius:7,padding:"4px 8px"}}><Av text={mb.avatar} color={RC.media_buyer} size={20}/><span style={{color:C.textS,fontSize:10}}>{mb.name}</span></div>}
-                {sm&&<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.03)",borderRadius:7,padding:"4px 8px"}}><Av text={sm.avatar} color={RC.social_media} size={20}/><span style={{color:C.textS,fontSize:10}}>{sm.name}</span></div>}
+                {mb&&<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.03)",borderRadius:7,padding:"4px 8px"}}><Av text={mb.avatar} img={mb.avatarUrl} color={RC.media_buyer} size={20}/><span style={{color:C.textS,fontSize:10}}>{mb.name}</span></div>}
+                {sm&&<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.03)",borderRadius:7,padding:"4px 8px"}}><Av text={sm.avatar} img={sm.avatarUrl} color={RC.social_media} size={20}/><span style={{color:C.textS,fontSize:10}}>{sm.name}</span></div>}
               </div>
               {latest&&<div style={{background:"rgba(255,255,255,0.03)",borderRadius:9,padding:"8px 10px",marginBottom:8}}><div style={{color:C.textS,fontSize:11,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",lineHeight:1.4}}>{latest.text}</div></div>}
               <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:todayFUs.length>0?C.green:C.textM,fontSize:11}}>{todayFUs.length} اليوم · {monthFUs.length} الشهر</span><span style={{color:C.purple,fontSize:12,fontWeight:600}}>فتح ←</span></div>
@@ -1366,7 +1445,7 @@ function ClientFU({client,users,followups,setFollowups,addNotif,currentUser,onBa
         </div>
       </div>
       <Mdl open={addOpen} onClose={()=>{setAddOpen(false);setText("");setImages([]);setErr("")}} title={`📌 فولو أب — ${client.name}`} width={500}>
-        <div style={{marginBottom:12,padding:"8px 12px",background:"rgba(255,255,255,0.03)",borderRadius:10,display:"flex",alignItems:"center",gap:8}}><Av text={currentUser.avatar} color={RC[currentUser.role]} size={28}/><div><div style={{color:C.text,fontSize:12,fontWeight:600}}>{currentUser.name}</div><div style={{color:C.textM,fontSize:10}}>{todayStr()}</div></div></div>
+        <div style={{marginBottom:12,padding:"8px 12px",background:"rgba(255,255,255,0.03)",borderRadius:10,display:"flex",alignItems:"center",gap:8}}><Av text={currentUser.avatar} img={currentUser.avatarUrl} color={RC[currentUser.role]} size={28}/><div><div style={{color:C.text,fontSize:12,fontWeight:600}}>{currentUser.name}</div><div style={{color:C.textM,fontSize:10}}>{todayStr()}</div></div></div>
         <div style={{marginBottom:14}}><label style={{display:"block",fontSize:12,fontWeight:600,color:C.textS,marginBottom:6}}>الملاحظة</label><textarea value={text} onChange={e=>setText(e.target.value)} placeholder="اكتب تحديث اليوم..." style={{width:"100%",padding:"12px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,outline:"none",fontFamily:"Cairo",boxSizing:"border-box",resize:"vertical",minHeight:90,direction:"rtl"}}/></div>
         <div style={{marginBottom:14}}><label style={{display:"block",fontSize:12,fontWeight:600,color:C.textS,marginBottom:6}}>صور (اختياري)</label>
           <div onClick={()=>fileRef.current?.click()} style={{border:`2px dashed ${C.border}`,borderRadius:12,padding:"16px",textAlign:"center",cursor:"pointer"}}><div style={{fontSize:20,marginBottom:4}}>📎</div><div style={{color:C.textS,fontSize:12}}>اضغط لإضافة صور</div></div>
@@ -1394,7 +1473,7 @@ function ClientFU({client,users,followups,setFollowups,addNotif,currentUser,onBa
             {clientFUs.length===0&&<Card s={{textAlign:"center",padding:"40px"}}><div style={{fontSize:28,marginBottom:8}}>📝</div><div style={{color:C.textS,fontSize:13}}>لا يوجد فولو أب بعد</div></Card>}
             {clientFUs.map(fu=>{const poster=users.find(u=>u.id===fu.userId);return(
               <Card key={fu.id} s={{marginBottom:10}}>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><Av text={poster?.avatar||"؟"} color={RC[poster?.role]||C.purple} size={30}/><div style={{flex:1}}><div style={{color:C.text,fontSize:12,fontWeight:600}}>{poster?.name}</div><div style={{color:C.textM,fontSize:10}}>{fmtDate(fu.date)}</div></div><Bdg label={RL[poster?.role]||"فريق"} color={RC[poster?.role]||C.purple}/></div>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><Av text={poster?.avatar||"؟"} img={poster?.avatarUrl} color={RC[poster?.role]||C.purple} size={30}/><div style={{flex:1}}><div style={{color:C.text,fontSize:12,fontWeight:600}}>{poster?.name}</div><div style={{color:C.textM,fontSize:10}}>{fmtDate(fu.date)}</div></div><Bdg label={RL[poster?.role]||"فريق"} color={RC[poster?.role]||C.purple}/></div>
                 {fu.text&&<div style={{color:C.textS,fontSize:12,lineHeight:1.6,marginBottom:fu.images?.length>0?10:0}}>{fu.text}</div>}
                 {fu.images?.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6}}>{fu.images.map((img,i)=><img key={i} src={img.data} style={{width:80,height:80,objectFit:"cover",borderRadius:8,border:`1px solid ${C.border}`,cursor:"pointer"}} onClick={()=>window.open(img.data,"_blank")} alt=""/>)}</div>}
               </Card>);
@@ -1533,7 +1612,7 @@ function CreativeTasks({tasks,setTasks,clients,users,currentUser}){
                   </div>
                   <div style={{color:C.textS,fontSize:12,marginBottom:6}}>{client?.name||t.clientName||"—"} · {t.forum} {t.noOfSizes?`· ${t.noOfSizes}`:""} {t.size?`· ${t.size}`:""}</div>
                   <div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
-                    {designer&&<div style={{display:"flex",alignItems:"center",gap:5}}><Av text={designer.avatar} color={RC.designer} size={20}/><span style={{color:C.textS,fontSize:11}}>{designer.name}</span></div>}
+                    {designer&&<div style={{display:"flex",alignItems:"center",gap:5}}><Av text={designer.avatar} img={designer.avatarUrl} color={RC.designer} size={20}/><span style={{color:C.textS,fontSize:11}}>{designer.name}</span></div>}
                     <span style={{color:C.textM,fontSize:11}}>🗓 نزل: {fmtDate(t.taskDate)}</span>
                     <span style={{color:late?C.red:C.textM,fontSize:11,fontWeight:late?700:400}}>⏰ ديدلاين: {fmtDate(t.deadLine)}</span>
                     {t.strategyLink&&<a href={t.strategyLink} target="_blank" rel="noreferrer" style={{color:C.blue,fontSize:11}}>Strategy ↗</a>}
@@ -1547,6 +1626,288 @@ function CreativeTasks({tasks,setTasks,clients,users,currentUser}){
                 </div>
               </div>
             </Card>);
+          })
+        }
+      </div>
+    </div>
+  );
+}
+
+// ═══ MOTION ═══════════════════════════════════════════════════════════════════
+const MAGENCIES=["Wameed","Al-Faisal","Imdad","In House"];
+const MDEPTS=["Ads","Social","Creative","SEO","Account"];
+const MFORUMS=["video montage","Cartoon 15sec","create Template","Cartoon 30sec","psd-logo Animation","Reasize","Edit","3d","Template","Episode"];
+const MSIZES=["Instagram","SnapChat","Twitter","Google","Snap + Insta","Snap + Google","Insta + Google","Insta + Snap + Twitter","Cover Highlight","Hightlight","Cover","Insta + Twitter","snap + tiktok","Insta + Snap + tiktok","Insta - Snap - Google","insta + snap + story","insta + tiktok","tiktok","tiktok + google","banner","Linkedin","Linkedin - X","Insta + Linkedin","meta + snap","LOGO","Branding","wbsite product","Paper"];
+const MSTATUS={Rejected:"مرفوض",Hold:"معلّق",Assigned:"متعين",["In Progress"]:"جاري",["In Review"]:"مراجعة",Done:"تم"};
+const MSTATUS_C={Rejected:C.red,Hold:C.orange,Assigned:C.textS,["In Progress"]:C.blue,["In Review"]:C.orange,Done:C.green};
+
+function AddMotionModal({open,onClose,onAdd,onSave,edit,clients,users}){
+  const E={taskOwner:"",agency:"",department:"",strategyLink:"",clientId:"",clientName:"",websiteLink:"",taskDate:todayStr(),notes:"",deadLine:"",nO:"",member:"",forum:MFORUMS[0],size:MSIZES[0],status:"Assigned",uploadFolder:"",done:false,director:false,time:""};
+  const [f,setF]=useState(edit||E);const [err,setErr]=useState("");
+  useEffect(()=>{setF(edit?{...E,...edit}:E)},[edit,open]);
+  const s=(k,v)=>setF(p=>{const n={...p,[k]:v};if(k==="taskDate"&&!edit)n.deadLine=dlDate(v);return n;});
+  const sub=()=>{
+    if(!f.taskOwner||!f.agency.trim()||!f.taskDate){setErr("أكمل الحقول المطلوبة (Task Owner + الأجنسي + تاريخ التاسك)");return;}
+    const payload={...f,deadLine:f.deadLine||dlDate(f.taskDate),clientId:f.clientId?+f.clientId:null};
+    if(edit)onSave({...payload,id:edit.id});else onAdd({...payload,id:Date.now()});
+    setErr("");onClose();
+  };
+  return(
+    <Mdl open={open} onClose={onClose} title={edit?"✏️ تعديل تاسك موشن":"🎬 إضافة تاسك موشن"} width={620}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <Sel label="Task Owner" value={f.taskOwner} onChange={v=>s("taskOwner",v)} opts={users.map(u=>({v:u.name,l:u.name}))} req mb={0} ph="اختر من المستخدمين"/>
+        <Inp label="Member" value={f.member} onChange={v=>s("member",v)} mb={0} placeholder="اسم العضو (اختياري)"/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Sel label="الأجنسي / Agency" value={f.agency} onChange={v=>s("agency",v)} opts={MAGENCIES.map(x=>({v:x,l:x}))} req mb={0}/>
+        <Sel label="الديبارتمنت" value={f.department} onChange={v=>s("department",v)} opts={MDEPTS.map(x=>({v:x,l:x}))} mb={0}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Sel label="العميل" value={f.clientId} onChange={v=>{s("clientId",v);const c=clients.find(x=>x.id===+v);if(c)s("clientName",c.name);}} opts={clients.map(c=>({v:c.id,l:c.name}))} ph="اختياري" mb={0}/>
+        <Inp label="اسم العميل (لو مش موجود بالنظام)" value={f.clientName} onChange={v=>s("clientName",v)} mb={0}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Inp label="Strategy Link" value={f.strategyLink} onChange={v=>s("strategyLink",v)} mb={0} placeholder="https://..."/>
+        <Inp label="Website Link" value={f.websiteLink} onChange={v=>s("websiteLink",v)} mb={0} placeholder="https://..."/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Inp label="تاريخ التاسك" value={f.taskDate} onChange={v=>s("taskDate",v)} type="date" req mb={0}/>
+        <Inp label="الديدلاين (تلقائي: +4 أيام)" value={f.deadLine} onChange={v=>s("deadLine",v)} type="date" mb={0}/>
+      </div>
+      <div style={{marginTop:12}}>
+        <label style={{display:"block",fontSize:12,fontWeight:600,color:C.textS,marginBottom:6}}>Notes / Data</label>
+        <textarea value={f.notes} onChange={e=>s("notes",e.target.value)} style={{width:"100%",padding:"10px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,outline:"none",fontFamily:"Cairo",boxSizing:"border-box",resize:"vertical",minHeight:60,direction:"rtl"}}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Sel label="Forum" value={f.forum} onChange={v=>s("forum",v)} opts={MFORUMS.map(x=>({v:x,l:x}))} mb={0}/>
+        <Sel label="Size" value={f.size} onChange={v=>s("size",v)} opts={MSIZES.map(x=>({v:x,l:x}))} mb={0}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Sel label="الحالة" value={f.status} onChange={v=>s("status",v)} opts={Object.entries(MSTATUS).map(([v,l])=>({v,l}))} mb={0}/>
+        <Inp label="N.O" value={f.nO} onChange={v=>s("nO",v)} mb={0}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+        <Inp label="Upload Folder" value={f.uploadFolder} onChange={v=>s("uploadFolder",v)} mb={0} placeholder="رابط الفولدر"/>
+        <Inp label="Time" value={f.time} onChange={v=>s("time",v)} mb={0} placeholder="Same"/>
+      </div>
+      <div style={{display:"flex",gap:20,marginTop:16}}>
+        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}><input type="checkbox" checked={f.done} onChange={e=>s("done",e.target.checked)}/><span style={{color:C.textS,fontSize:12}}>Done</span></label>
+        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}><input type="checkbox" checked={f.director} onChange={e=>s("director",e.target.checked)}/><span style={{color:C.textS,fontSize:12}}>Director</span></label>
+      </div>
+      {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginTop:14,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
+      <div style={{display:"flex",gap:10,marginTop:16}}>
+        <Btn onClick={sub} style={{flex:1,padding:13}}>✓ حفظ</Btn>
+        <button onClick={onClose} style={{padding:"12px 20px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:12,color:C.textS,fontSize:14,fontFamily:"Cairo",cursor:"pointer"}}>إلغاء</button>
+      </div>
+    </Mdl>
+  );
+}
+
+function MotionTasks({tasks,setTasks,clients,users,currentUser}){
+  const [addOpen,setAddOpen]=useState(false);const [edit,setEdit]=useState(null);
+  const [filter,setFilter]=useState("all");const [filterOwner,setFilterOwner]=useState("all");
+  const isLate=(t)=>!t.done&&t.deadLine&&new Date(t.deadLine)<new Date();
+  const filtered=tasks.filter(t=>{
+    if(filter==="late"&&!isLate(t))return false;
+    if(filter!=="all"&&filter!=="late"&&t.status!==filter)return false;
+    if(filterOwner!=="all"&&t.taskOwner!==filterOwner)return false;
+    return true;
+  });
+  const lateCount=tasks.filter(isLate).length;
+  return(
+    <div>
+      <AddMotionModal open={addOpen||!!edit} onClose={()=>{setAddOpen(false);setEdit(null)}}
+        onAdd={t=>setTasks(p=>[...p,t])} onSave={t=>setTasks(p=>p.map(x=>x.id===t.id?{...x,...t}:x))}
+        edit={edit} clients={clients} users={users}/>
+      <TB title="الموشن 🎬" sub={`${tasks.length} تاسك · ${lateCount} متأخر · متزامن مع Google Sheet`}>
+        <Btn onClick={()=>setAddOpen(true)}>+ تاسك جديد</Btn>
+      </TB>
+      <div style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
+          <StC label="إجمالي التاسكات" value={tasks.length} icon="🎬" color={C.purple}/>
+          <StC label="جاري" value={tasks.filter(t=>t.status==="In Progress").length} icon="🔄" color={C.blue}/>
+          <StC label="تم" value={tasks.filter(t=>t.done).length} icon="✅" color={C.green}/>
+          <StC label="متأخر (بعد 4 أيام)" value={lateCount} icon="🚨" color={C.red}/>
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+          {["all","Assigned","In Progress","In Review","Hold","Rejected","Done","late"].map(s=>(
+            <button key={s} onClick={()=>setFilter(s)} style={{padding:"8px 14px",borderRadius:20,fontFamily:"Cairo",fontSize:12,cursor:"pointer",border:"1px solid",background:filter===s?`${C.pink}18`:C.bgCard,color:filter===s?C.pink:C.textS,borderColor:filter===s?`${C.pink}44`:C.border}}>
+              {s==="all"?"الكل":s==="late"?"⚠️ متأخر":MSTATUS[s]}
+            </button>
+          ))}
+          <select value={filterOwner} onChange={e=>setFilterOwner(e.target.value)} style={{padding:"8px 14px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none"}}>
+            <option value="all">كل الـ Task Owners</option>
+            {users.map(u=><option key={u.id} value={u.name}>{u.name}</option>)}
+          </select>
+        </div>
+        {filtered.length===0
+          ?<Card s={{textAlign:"center",padding:"60px"}}><div style={{fontSize:40,marginBottom:12}}>🎬</div><div style={{color:C.textS,fontSize:14}}>لا توجد تاسكات بهذا الفلتر</div></Card>
+          :filtered.map(t=>{
+            const client=clients.find(c=>c.id===t.clientId);
+            const late=isLate(t);
+            return(<Card key={t.id} s={{marginBottom:10,padding:"14px 16px"}}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+                    <span style={{color:C.text,fontSize:13,fontWeight:700}}>{t.agency}</span>
+                    {t.department&&<Bdg label={t.department} color={C.purple} dot={false}/>}
+                    <Bdg label={MSTATUS[t.status]||t.status} color={MSTATUS_C[t.status]||C.textS}/>
+                    {late&&<Bdg label="متأخر ⚠️" color={C.red}/>}
+                    {t.director&&<Bdg label="✓ Director" color={C.green} dot={false}/>}
+                  </div>
+                  <div style={{color:C.textS,fontSize:12,marginBottom:6}}>{client?.name||t.clientName||"—"} · {t.forum} {t.size?`· ${t.size}`:""}</div>
+                  <div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
+                    {t.taskOwner&&<span style={{color:C.textS,fontSize:11}}>👤 {t.taskOwner}</span>}
+                    {t.member&&<span style={{color:C.textM,fontSize:11}}>· {t.member}</span>}
+                    <span style={{color:C.textM,fontSize:11}}>🗓 نزل: {fmtDate(t.taskDate)}</span>
+                    <span style={{color:late?C.red:C.textM,fontSize:11,fontWeight:late?700:400}}>⏰ ديدلاين: {fmtDate(t.deadLine)}</span>
+                    {t.strategyLink&&<a href={t.strategyLink} target="_blank" rel="noreferrer" style={{color:C.blue,fontSize:11}}>Strategy ↗</a>}
+                    {t.uploadFolder&&<a href={t.uploadFolder} target="_blank" rel="noreferrer" style={{color:C.green,fontSize:11}}>Upload ↗</a>}
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:6,flexShrink:0}}>
+                  {!t.done&&<button onClick={()=>setTasks(p=>p.map(x=>x.id===t.id?{...x,done:true,status:"Done"}:x))} style={{padding:"6px 12px",borderRadius:8,background:`${C.green}18`,border:`1px solid ${C.green}33`,color:C.green,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>✓ تم</button>}
+                  <button onClick={()=>setEdit(t)} style={{padding:"6px 10px",borderRadius:8,background:`${C.purple}18`,border:`1px solid ${C.purple}33`,color:C.purple,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>✏️</button>
+                  <button onClick={()=>{if(window.confirm("حذف التاسك؟"))setTasks(p=>p.filter(x=>x.id!==t.id));}} style={{padding:"6px 10px",borderRadius:8,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>
+                </div>
+              </div>
+            </Card>);
+          })
+        }
+      </div>
+    </div>
+  );
+}
+
+// ═══ MEDIA RENEWALS ═══════════════════════════════════════════════════════════
+const RSTATUS_OPTS=["مجدد","جدد","هولد","جدد سوشيال","جدد سيو"];
+const RSTATUS_C={"مجدد":C.green,"جدد":C.blue,"هولد":C.orange,"جدد سوشيال":C.purple,"جدد سيو":C.teal};
+const RPACKAGE_OPTS=["Full","Ads","SEO","Social"];
+const RENEWED_SET=new Set(["مجدد","جدد","جدد سوشيال","جدد سيو"]);
+
+function currentMonthTab(){ return new Date().toLocaleString("en-US",{month:"long",year:"numeric"}); }
+
+function AddRenewalRowModal({open,onClose,onAdd,users}){
+  const E={projectName:"",endDate:"",meetingDone:false,status:"",mediaBuyer:"",package:"Ads"};
+  const [f,setF]=useState(E);const [err,setErr]=useState("");
+  useEffect(()=>{ if(open) setF(E); },[open]);
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const mbs=users.filter(u=>u.role==="media_buyer");
+  const sub=()=>{
+    if(!f.projectName.trim()||!f.endDate){setErr("محتاج اسم العميل وتاريخ الانتهاء على الأقل");return;}
+    onAdd({...f,id:crypto.randomUUID?crypto.randomUUID():String(Date.now())});
+    onClose();
+  };
+  return(
+    <Mdl open={open} onClose={onClose} title="➕ إضافة عميل يدوي لشهر التجديد" width={480}>
+      <Inp label="اسم العميل" value={f.projectName} onChange={v=>s("projectName",v)} req/>
+      <Inp label="تاريخ الانتهاء" value={f.endDate} onChange={v=>s("endDate",v)} type="date" req/>
+      <Sel label="Media Buyer" value={f.mediaBuyer} onChange={v=>s("mediaBuyer",v)} opts={mbs.map(u=>({v:u.name,l:u.name}))}/>
+      <Sel label="Package" value={f.package} onChange={v=>s("package",v)} opts={RPACKAGE_OPTS.map(x=>({v:x,l:x}))}/>
+      {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginTop:6,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
+      <Btn onClick={sub} style={{width:"100%",padding:13,marginTop:10}}>✓ إضافة</Btn>
+    </Mdl>
+  );
+}
+
+function MediaRenewals({tasks,setTasks,tabInfo,onRollover,rollingOver,clients,users,currentUser}){
+  const isTeam=currentUser.role==="admin"||currentUser.isHeadOf==="media";
+  const [addOpen,setAddOpen]=useState(false);
+  const mine=isTeam?tasks:tasks.filter(t=>t.mediaBuyer===currentUser.name);
+
+  const byBuyer=useMemo(()=>{
+    const map={};
+    tasks.forEach(t=>{
+      const key=t.mediaBuyer||"—";
+      if(!map[key])map[key]={name:key,clients:0,renewed:0,lost:0};
+      map[key].clients++;
+      if(RENEWED_SET.has(t.status))map[key].renewed++;
+      const c=clients.find(x=>x.id===t.id);
+      if(c?.status==="cancelled")map[key].lost++;
+    });
+    return Object.values(map).map(b=>({...b,remain:b.clients-b.renewed-b.lost,pct:b.clients?Math.round(b.renewed/b.clients*100):0}));
+  },[tasks,clients]);
+
+  const upd=(t,patch)=>setTasks(p=>p.map(x=>x.id===t.id?{...x,...patch}:x));
+  const days=(t)=>{ const n=parseFloat(t.daysRemaining); return isNaN(n)?null:Math.round(n); };
+
+  return(
+    <div>
+      <AddRenewalRowModal open={addOpen} onClose={()=>setAddOpen(false)} onAdd={t=>setTasks(p=>[...p,t])} users={users}/>
+      <TB title="تجديدات الميديا 🔁" sub={`${tabInfo?.tab||currentMonthTab()} · ${tasks.length} عميل${tabInfo?.exists===false?" · لسه الشهر ده متعملوش":""}`}>
+        {isTeam&&<div style={{display:"flex",gap:8}}>
+          <Btn onClick={onRollover} style={{padding:"10px 16px"}}>{rollingOver?"...جاري":"🔄 ابدأ/حدّث شهر"}</Btn>
+          <button onClick={()=>setAddOpen(true)} style={{padding:"10px 16px",borderRadius:10,background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,color:C.textS,fontSize:13,fontFamily:"Cairo",cursor:"pointer"}}>+ إضافة يدوي</button>
+        </div>}
+      </TB>
+      <div style={{padding:"0 32px"}}>
+        {tabInfo?.exists===false&&(
+          <Card s={{textAlign:"center",padding:"40px",marginBottom:20}}>
+            <div style={{fontSize:34,marginBottom:10}}>📅</div>
+            <div style={{color:C.textS,fontSize:14,marginBottom:6}}>شهر {tabInfo.tab} لسه معملوش تاب في الشيت</div>
+            {isTeam
+              ?<div style={{color:C.textM,fontSize:12}}>اضغط "🔄 ابدأ/حدّث شهر" فوق عشان تجيب عملاء الشهر ده تلقائي</div>
+              :<div style={{color:C.textM,fontSize:12}}>كلم المدير يشغّل الشهر الجديد</div>}
+          </Card>
+        )}
+
+        {isTeam&&byBuyer.length>0&&(
+          <Card s={{marginBottom:20,padding:0,overflow:"hidden"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead><tr style={{background:"rgba(255,255,255,0.03)"}}>
+                {["Media Buyer","العملاء","تجديد","متبقي","فقد","النسبة"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"center",color:C.textS,fontWeight:700}}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {byBuyer.map(b=>(
+                  <tr key={b.name} style={{borderTop:`1px solid ${C.border}`}}>
+                    <td style={{padding:"10px 14px",color:C.text,fontWeight:600}}>{b.name}</td>
+                    <td style={{padding:"10px 14px",textAlign:"center",color:C.textS}}>{b.clients}</td>
+                    <td style={{padding:"10px 14px",textAlign:"center",color:C.green}}>{b.renewed}</td>
+                    <td style={{padding:"10px 14px",textAlign:"center",color:C.orange}}>{b.remain}</td>
+                    <td style={{padding:"10px 14px",textAlign:"center",color:C.red}}>{b.lost}</td>
+                    <td style={{padding:"10px 14px",textAlign:"center",color:C.text,fontWeight:700}}>{b.pct}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
+        {mine.length===0
+          ?<Card s={{textAlign:"center",padding:"50px"}}><div style={{fontSize:36,marginBottom:10}}>🔁</div><div style={{color:C.textS,fontSize:13}}>مفيش عملاء للتجديد {isTeam?"":"عندك"} الشهر ده</div></Card>
+          :mine.slice().sort((a,b)=>(days(a)??999)-(days(b)??999)).map(t=>{
+            const d=days(t);
+            const urgent=d!==null&&d<=3;
+            return(
+              <Card key={t.id} s={{marginBottom:10,padding:"12px 16px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+                  <div style={{minWidth:160}}>
+                    <div style={{color:C.text,fontSize:13,fontWeight:700}}>{t.projectName}</div>
+                    <div style={{color:d!==null&&d<0?C.red:urgent?C.orange:C.textM,fontSize:11,fontWeight:d!==null&&d<0?700:400}}>
+                      {d===null?"—":d<0?`متأخر ${Math.abs(d)} يوم`:`باقي ${d} يوم`} · {fmtDate(t.endDate)}
+                    </div>
+                  </div>
+                  <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}>
+                    <input type="checkbox" checked={t.meetingDone} onChange={e=>upd(t,{meetingDone:e.target.checked})}/>
+                    <span style={{color:C.textS,fontSize:11}}>Meeting</span>
+                  </label>
+                  <select value={t.status} onChange={e=>upd(t,{status:e.target.value})} style={{padding:"7px 10px",borderRadius:8,background:C.bgCard,border:`1px solid ${RSTATUS_C[t.status]||C.border}`,color:RSTATUS_C[t.status]||C.textS,fontSize:11,fontFamily:"Cairo",outline:"none"}}>
+                    <option value="">— الحالة —</option>
+                    {RSTATUS_OPTS.map(s=><option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <select value={t.package} onChange={e=>upd(t,{package:e.target.value})} style={{padding:"7px 10px",borderRadius:8,background:C.bgCard,border:`1px solid ${C.border}`,color:C.textS,fontSize:11,fontFamily:"Cairo",outline:"none"}}>
+                    {RPACKAGE_OPTS.map(s=><option key={s} value={s}>{s}</option>)}
+                  </select>
+                  {isTeam
+                    ?<select value={t.mediaBuyer} onChange={e=>upd(t,{mediaBuyer:e.target.value})} style={{padding:"7px 10px",borderRadius:8,background:C.bgCard,border:`1px solid ${C.border}`,color:C.textS,fontSize:11,fontFamily:"Cairo",outline:"none"}}>
+                      <option value="">— Media Buyer —</option>
+                      {users.filter(u=>u.role==="media_buyer").map(u=><option key={u.id} value={u.name}>{u.name}</option>)}
+                    </select>
+                    :<span style={{color:C.textM,fontSize:11}}>👤 {t.mediaBuyer}</span>}
+                  <button onClick={()=>{if(window.confirm("حذف الصف؟"))setTasks(p=>p.filter(x=>x.id!==t.id));}} style={{padding:"6px 10px",borderRadius:8,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>
+                </div>
+              </Card>
+            );
           })
         }
       </div>
@@ -1711,7 +2072,7 @@ function Tasks({tasks,setTasks,clients,users,currentUser}){
               <div style={{width:4,height:36,borderRadius:2,background:isLate?C.red:TSC[t.status]||C.orange,flexShrink:0}}/>
               <div style={{flex:1}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}><div style={{color:C.text,fontSize:13,fontWeight:700}}>{t.title}</div>{client&&<Bdg label={client.name} color={C.blue} dot={false}/>}<span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:`${priC}18`,color:priC,fontWeight:600}}>{t.priority==="high"?"عالية":t.priority==="medium"?"متوسطة":"منخفضة"}</span></div>
-                <div style={{display:"flex",gap:10,alignItems:"center"}}>{member&&<div style={{display:"flex",alignItems:"center",gap:5}}><Av text={member.avatar} color={RC[member.role]} size={18}/><span style={{color:C.textS,fontSize:11}}>{member.name}</span></div>}<span style={{color:isLate?C.red:C.textM,fontSize:11}}>⏰ {fmtDate(t.due)}</span></div>
+                <div style={{display:"flex",gap:10,alignItems:"center"}}>{member&&<div style={{display:"flex",alignItems:"center",gap:5}}><Av text={member.avatar} img={member.avatarUrl} color={RC[member.role]} size={18}/><span style={{color:C.textS,fontSize:11}}>{member.name}</span></div>}<span style={{color:isLate?C.red:C.textM,fontSize:11}}>⏰ {fmtDate(t.due)}</span></div>
               </div>
               <div style={{display:"flex",gap:6}}>
                 {t.status!=="done"&&<button onClick={()=>setTasks(p=>p.map(x=>x.id===t.id?{...x,status:"done"}:x))} style={{padding:"6px 12px",borderRadius:8,background:`${C.green}18`,border:`1px solid ${C.green}33`,color:C.green,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>✓ إنجاز</button>}
@@ -1903,7 +2264,7 @@ function Payroll({users,clients,payroll,setPayroll}){
               const net=(r.base||0)+(r.commission||0)+(r.bonus||0)-(r.deductions||0);
               const hasData=r.base>0;
               return(<tr key={u.id} style={{borderBottom:`1px solid ${C.border}`,transition:"background .15s"}} onMouseEnter={e=>e.currentTarget.style.background=C.bgHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                <td style={{padding:"13px 14px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><Av text={u.avatar} color={RC[u.role]} size={30}/><div style={{color:C.text,fontSize:13,fontWeight:600}}>{u.name}</div></div></td>
+                <td style={{padding:"13px 14px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><Av text={u.avatar} img={u.avatarUrl} color={RC[u.role]} size={30}/><div style={{color:C.text,fontSize:13,fontWeight:600}}>{u.name}</div></div></td>
                 <td style={{padding:"13px 14px"}}><Bdg label={RL[u.role]} color={RC[u.role]}/></td>
                 <td style={{padding:"13px 14px",color:hasData?C.text:C.textM,fontSize:13}}>{hasData?(r.base||0).toLocaleString()+" SAR":"—"}</td>
                 <td style={{padding:"13px 14px",color:C.green,fontSize:13,fontWeight:600}}>{hasData?"+"+( r.commission||0).toLocaleString():"—"}</td>
@@ -1986,7 +2347,7 @@ function TeamMgmt({users,setUsers}){
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
               {users.filter(u=>u.role===role).map(u=>(
                 <Card key={u.id}>
-                  <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}><Av text={u.avatar} color={RC[u.role]} size={44}/><div style={{flex:1,minWidth:0}}><div style={{color:C.text,fontSize:13,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}</div><div style={{color:RC[u.role],fontSize:10,fontWeight:500}}>{RL[u.role]}</div></div></div>
+                  <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}><Av text={u.avatar} img={u.avatarUrl} color={RC[u.role]} size={44}/><div style={{flex:1,minWidth:0}}><div style={{color:C.text,fontSize:13,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}</div><div style={{color:RC[u.role],fontSize:10,fontWeight:500}}>{RL[u.role]}</div></div></div>
                   <div style={{padding:"7px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:10}}><div style={{color:C.textM,fontSize:10,marginBottom:1}}>البريد</div><div style={{color:C.textS,fontSize:11,direction:"ltr",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div></div>
                   <div style={{display:"flex",gap:8}}>
                     <button onClick={()=>{setF({name:u.name,role:u.role,email:u.email,password:u.password});setErr("");setEdit(u);setOpen(true)}} style={{flex:1,padding:"7px",borderRadius:9,background:`${C.purple}18`,border:`1px solid ${C.purple}33`,color:C.purple,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>✏️ تعديل</button>
@@ -2186,8 +2547,8 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
         </nav>
         <div style={{padding:14,borderTop:`1px solid ${C.border}`}}>
           <div style={{marginBottom:10,padding:"8px 12px",background:"rgba(255,255,255,0.03)",borderRadius:9}}>
-            {mb&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><Av text={mb.avatar} color={RC.media_buyer} size={24}/><div><div style={{color:C.text,fontSize:11,fontWeight:600}}>{mb.name}</div><div style={{color:C.textM,fontSize:9}}>Media Buyer</div></div></div>}
-            {sm&&<div style={{display:"flex",alignItems:"center",gap:8}}><Av text={sm.avatar} color={RC.social_media} size={24}/><div><div style={{color:C.text,fontSize:11,fontWeight:600}}>{sm.name}</div><div style={{color:C.textM,fontSize:9}}>Social Media</div></div></div>}
+            {mb&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><Av text={mb.avatar} img={mb.avatarUrl} color={RC.media_buyer} size={24}/><div><div style={{color:C.text,fontSize:11,fontWeight:600}}>{mb.name}</div><div style={{color:C.textM,fontSize:9}}>Media Buyer</div></div></div>}
+            {sm&&<div style={{display:"flex",alignItems:"center",gap:8}}><Av text={sm.avatar} img={sm.avatarUrl} color={RC.social_media} size={24}/><div><div style={{color:C.text,fontSize:11,fontWeight:600}}>{sm.name}</div><div style={{color:C.textM,fontSize:9}}>Social Media</div></div></div>}
           </div>
           <button onClick={onLogout} style={{width:"100%",padding:"7px",borderRadius:9,fontFamily:"Cairo",background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:12,fontWeight:600,cursor:"pointer"}}>خروج</button>
         </div>
@@ -2576,6 +2937,10 @@ export default function App(){
   const [payroll, setPayrollRaw] = useState(() => ls.get("w_payroll", []));
   const [satisfaction, setSatisfactionRaw] = useState(() => ls.get("w_satisfaction", ISAT));
   const [creativeTasks, setCreativeTasksRaw] = useState(() => ls.get("w_creative", []));
+  const [motionTasks, setMotionTasksRaw] = useState(() => ls.get("w_motion", []));
+  const [mediaRenewals, setMediaRenewalsRaw] = useState(() => ls.get("w_mediaRenewals", []));
+  const [mediaTabInfo, setMediaTabInfo] = useState(null);
+  const [rollingOverMedia, setRollingOverMedia] = useState(false);
   const [targets, setTargets] = useState(ITARGETS);
   const [notes, setNotes] = useState(INOTES);
   const [notifs, setNotifs] = useState(INF);
@@ -2594,6 +2959,8 @@ export default function App(){
   const setPayroll = mk("w_payroll", setPayrollRaw);
   const setSatisfaction = mk("w_satisfaction", setSatisfactionRaw);
   const setCreativeTasks = mk("w_creative", setCreativeTasksRaw);
+  const setMotionTasks = mk("w_motion", setMotionTasksRaw);
+  const setMediaRenewals = mk("w_mediaRenewals", setMediaRenewalsRaw);
 
   // ─── SUPABASE INIT ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -2623,6 +2990,42 @@ export default function App(){
   };
   useEffect(() => { if (page === "creative") loadCreativeFromSheet(); }, [page]);
 
+  // ─── MOTION MODULE — نفس الفكرة، الشيت هو قاعدة البيانات مباشرة ─────────────
+  const MOTION_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/motion-sheet-api";
+  const MOTION_API_SECRET = "wameed-motion-7c2e9a4f1b6d8e3a";
+  const motionUrl = () => `${MOTION_API}?secret=${encodeURIComponent(MOTION_API_SECRET)}`;
+  const loadMotionFromSheet = async () => {
+    try {
+      const res = await fetch(motionUrl());
+      const data = await res.json();
+      if (data?.tasks) { setMotionTasksRaw(data.tasks); ls.set("w_motion", data.tasks); }
+    } catch(e) { console.error("Failed to load motion tasks from sheet:", e); }
+  };
+  useEffect(() => { if (page === "motion") loadMotionFromSheet(); }, [page]);
+
+  // ─── MEDIA RENEWALS — تاب شهري تلقائي جوه شيت التجديدات ─────────────────────
+  const MEDIA_RENEWALS_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/media-renewals-sheet-api";
+  const MEDIA_RENEWALS_ROLLOVER_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/media-renewals-rollover";
+  const MEDIA_RENEWALS_SECRET = "wameed-media-renew-9f3b6e1a4c7d2058";
+  const mediaRenewalsUrl = () => `${MEDIA_RENEWALS_API}?secret=${encodeURIComponent(MEDIA_RENEWALS_SECRET)}`;
+  const loadMediaRenewalsFromSheet = async () => {
+    try {
+      const res = await fetch(mediaRenewalsUrl());
+      const data = await res.json();
+      setMediaTabInfo({ tab: data.tab, exists: data.exists });
+      if (data?.tasks) { setMediaRenewalsRaw(data.tasks); ls.set("w_mediaRenewals", data.tasks); }
+    } catch(e) { console.error("Failed to load media renewals from sheet:", e); }
+  };
+  const runMediaRollover = async () => {
+    setRollingOverMedia(true);
+    try {
+      await fetch(`${MEDIA_RENEWALS_ROLLOVER_API}?secret=${encodeURIComponent(MEDIA_RENEWALS_SECRET)}`, { method: "POST" });
+      await loadMediaRenewalsFromSheet();
+    } catch(e) { console.error("Media rollover failed:", e); }
+    setRollingOverMedia(false);
+  };
+  useEffect(() => { if (page === "media-renewals") loadMediaRenewalsFromSheet(); }, [page]);
+
   const loadFromDB = async () => {
     if (!window.__SB) return;
     try {
@@ -2639,7 +3042,7 @@ export default function App(){
         window.__SB.from("payroll").select("*"),
       ]);
       if(dU?.length) {
-        const v=dU.map(u=>({...u,avatar:u.avatar||ini(u.name)}));
+        const v=dU.map(u=>({...u,avatar:u.avatar||ini(u.name),avatarUrl:u.avatar_url,isHeadOf:u.is_head_of}));
         // الأدمن الأساسي (IU[0]) لازم يفضل موجود دايمًا حتى لو قاعدة البيانات
         // فيها بيانات، عشان تسجيل الدخول ميتقفلش عليه أبدًا.
         const hasSuperAdmin = v.some(u=>u.email===IU[0].email);
@@ -2697,6 +3100,30 @@ export default function App(){
       });
     });
   }, [creativeTasks]);
+
+  // late motion-task alerts — deadline = task date + 4 days
+  useEffect(() => {
+    if (!user || user.type === "client") return;
+    motionTasks.filter(t => !t.done).forEach(t => {
+      if (!t.deadLine || new Date(t.deadLine) >= new Date()) return;
+      if (notifs.find(n => n.type === "motion_late" && n.motionId === t.id)) return;
+      const owner = users.find(u => u.name === t.taskOwner);
+      addNotif({
+        type: "motion_late",
+        motionId: t.id,
+        title: "⚠️ تاسك موشن متأخر",
+        body: `${t.agency}${t.taskOwner ? " — " + t.taskOwner : ""} — تجاوز الديدلاين (${fmtDate(t.deadLine)})`,
+        userId: 1,
+      });
+      if (owner) addNotif({
+        type: "motion_late",
+        motionId: t.id,
+        title: "⚠️ عندك تاسك موشن متأخر",
+        body: `${t.agency} — كان لازم يتسلم بتاريخ ${fmtDate(t.deadLine)}`,
+        userId: owner.id,
+      });
+    });
+  }, [motionTasks]);
 
   // ─── ROUTING ──────────────────────────────────────────────────────────────
   if (!user) return <Login onLogin={u => { setUser(u); setPage("dashboard"); }} />;
@@ -2776,6 +3203,55 @@ export default function App(){
       }}
       clients={clients} users={users} currentUser={user}
     />,
+    motion: <MotionTasks
+      tasks={motionTasks}
+      setTasks={async (fn) => {
+        const prev = motionTasks;
+        const next = typeof fn === "function" ? fn(prev) : fn;
+        const opts = { headers: {"Content-Type":"application/json"} };
+        try{
+          if (next.length > prev.length) {
+            const t = next[next.length-1];
+            await fetch(motionUrl(), {...opts, method:"POST", body: JSON.stringify(t)});
+          } else if (next.length < prev.length) {
+            const removed = prev.find(t => !next.find(x => x.id === t.id));
+            if (removed) await fetch(motionUrl(), {...opts, method:"DELETE", body: JSON.stringify({id: removed.id})});
+          } else {
+            const changed = next.find((t,i) => JSON.stringify(t) !== JSON.stringify(prev[i]));
+            if (changed) await fetch(motionUrl(), {...opts, method:"PUT", body: JSON.stringify(changed)});
+          }
+        }catch(e){ console.error("Motion sheet sync failed:", e); }
+        setMotionTasks(next);
+        loadMotionFromSheet();
+      }}
+      clients={clients} users={users} currentUser={user}
+    />,
+    "media-renewals": <MediaRenewals
+      tasks={mediaRenewals}
+      tabInfo={mediaTabInfo}
+      rollingOver={rollingOverMedia}
+      onRollover={runMediaRollover}
+      setTasks={async (fn) => {
+        const prev = mediaRenewals;
+        const next = typeof fn === "function" ? fn(prev) : fn;
+        const opts = { headers: {"Content-Type":"application/json"} };
+        try{
+          if (next.length > prev.length) {
+            const t = next[next.length-1];
+            await fetch(mediaRenewalsUrl(), {...opts, method:"POST", body: JSON.stringify(t)});
+          } else if (next.length < prev.length) {
+            const removed = prev.find(t => !next.find(x => x.id === t.id));
+            if (removed) await fetch(mediaRenewalsUrl(), {...opts, method:"DELETE", body: JSON.stringify({id: removed.id})});
+          } else {
+            const changed = next.find((t,i) => JSON.stringify(t) !== JSON.stringify(prev[i]));
+            if (changed) await fetch(mediaRenewalsUrl(), {...opts, method:"PUT", body: JSON.stringify(changed)});
+          }
+        }catch(e){ console.error("Media renewals sheet sync failed:", e); }
+        setMediaRenewals(next);
+        loadMediaRenewalsFromSheet();
+      }}
+      clients={clients} users={users} currentUser={user}
+    />,
     campaigns: <Campaigns
       campaigns={campaigns}
       setCampaigns={(fn) => {
@@ -2848,7 +3324,12 @@ export default function App(){
   return (
     <div style={{minHeight:"100vh", background:C.bg, fontFamily:"Cairo", direction:"rtl", display:"flex"}}>
       <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
-      <Sidebar page={page} setPage={setPage} user={user} onLogout={() => setUser(null)} unread={unread}/>
+      <Sidebar page={page} setPage={setPage} user={user} onLogout={() => setUser(null)} unread={unread}
+        onAvatarSaved={(url)=>{
+          setUser({...user, avatarUrl:url});
+          setUsers(p=>p.map(u=>u.id===user.id?{...u,avatarUrl:url}:u));
+        }}
+      />
       <main style={{flex:1, marginRight:230, overflowY:"auto", minHeight:"100vh", paddingBottom:40}}>
         <div style={{position:"sticky",top:0,zIndex:50,background:`${C.bg}ee`,backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.border}`,padding:"9px 28px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span style={{fontSize:11,fontWeight:600,color:dbReady?C.green:C.orange}}>
