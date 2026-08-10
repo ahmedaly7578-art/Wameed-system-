@@ -245,10 +245,10 @@ function EditAvatarModal({open,onClose,currentUser,onSaved}){
   );
 }
 
-function Sidebar({page,setPage,user,onLogout,unread,onAvatarSaved}){
+function Sidebar({page,setPage,user,onLogout,unread,onAvatarSaved,open,onClose}){
   const [editAvatar,setEditAvatar]=useState(false);
   return(
-    <div style={{width:230,background:C.bgCard,borderLeft:`1px solid ${C.border}`,display:"flex",flexDirection:"column",height:"100vh",position:"fixed",right:0,top:0,zIndex:100,overflowY:"auto"}}>
+    <div className={`wm-sidebar${open?" wm-open":""}`} style={{width:230,background:C.bgCard,borderLeft:`1px solid ${C.border}`,display:"flex",flexDirection:"column",height:"100vh",position:"fixed",right:0,top:0,zIndex:100,overflowY:"auto"}}>
       <div style={{padding:"20px 20px 16px",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <svg width={24} height={24} viewBox="0 0 60 60" fill="none"><defs><linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E879A0"/><stop offset="100%" stopColor="#7B6FE0"/></linearGradient></defs><path d="M30 2 L36 22 L56 22 L40 35 L46 55 L30 43 L14 55 L20 35 L4 22 L24 22 Z" fill="url(#sg)"/></svg>
@@ -259,7 +259,7 @@ function Sidebar({page,setPage,user,onLogout,unread,onAvatarSaved}){
         {NAV.filter(n=>(!n.admin||user.role==="admin")&&(!n.mediaOnly||user.role==="admin"||user.role==="media_buyer")).map(n=>{
           const a=page===n.id;
           return(
-            <button key={n.id} onClick={()=>setPage(n.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,marginBottom:2,background:a?`${C.pink}18`:"transparent",border:a?`1px solid ${C.pink}33`:"1px solid transparent",cursor:"pointer",fontFamily:"Cairo",transition:"all .15s",color:a?C.pink:C.textS,fontSize:12.5,fontWeight:a?600:400,textAlign:"right"}}
+            <button key={n.id} onClick={()=>{setPage(n.id);onClose&&onClose();}} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,marginBottom:2,background:a?`${C.pink}18`:"transparent",border:a?`1px solid ${C.pink}33`:"1px solid transparent",cursor:"pointer",fontFamily:"Cairo",transition:"all .15s",color:a?C.pink:C.textS,fontSize:12.5,fontWeight:a?600:400,textAlign:"right"}}
               onMouseEnter={e=>{if(!a)e.currentTarget.style.background="rgba(255,255,255,0.04)"}}
               onMouseLeave={e=>{if(!a)e.currentTarget.style.background="transparent"}}>
               <span style={{fontSize:14}}>{n.icon}</span>{n.label}
@@ -2500,6 +2500,7 @@ ${myCams.map(c=>`
 // ═══ CLIENT PORTAL ════════════════════════════════════════════════════════════
 function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, setSatisfaction}){
   const [page, setPage] = useState("overview");
+  const [navOpen, setNavOpen] = useState(false);
   const [ratingDone,setRatingDone] = useState(false);
   const [ratingF,setRatingF] = useState({roas:0,speed:0,reports:0,overall:0,comment:""});
   const myCams = campaigns.filter(c=>c.clientId===clientData.id);
@@ -2523,7 +2524,11 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"Cairo",direction:"rtl",display:"flex"}}>
       <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
       {/* Sidebar */}
-      <div style={{width:220,background:C.bgCard,borderLeft:`1px solid ${C.border}`,display:"flex",flexDirection:"column",height:"100vh",position:"fixed",right:0,top:0}}>
+      <div className={`wm-overlay${navOpen?" wm-open":""}`} onClick={()=>setNavOpen(false)}/>
+      <button className="wm-hamburger" onClick={()=>setNavOpen(v=>!v)} aria-label="فتح القائمة">
+        {navOpen ? "✕" : "☰"}
+      </button>
+      <div className={`wm-sidebar${navOpen?" wm-open":""}`} style={{width:220,background:C.bgCard,borderLeft:`1px solid ${C.border}`,display:"flex",flexDirection:"column",height:"100vh",position:"fixed",right:0,top:0}}>
         <div style={{padding:"20px 18px 16px",borderBottom:`1px solid ${C.border}`}}>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
             <svg width={22} height={22} viewBox="0 0 60 60" fill="none"><defs><linearGradient id="sgc" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E879A0"/><stop offset="100%" stopColor="#7B6FE0"/></linearGradient></defs><path d="M30 2 L36 22 L56 22 L40 35 L46 55 L30 43 L14 55 L20 35 L4 22 L24 22 Z" fill="url(#sgc)"/></svg>
@@ -2538,7 +2543,7 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
         <nav style={{flex:1,padding:"10px 8px"}}>
           {NAV_CLIENT.map(n=>{
             const a=page===n.id;
-            return(<button key={n.id} onClick={()=>setPage(n.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,marginBottom:2,background:a?`${C.pink}18`:"transparent",border:a?`1px solid ${C.pink}33`:"1px solid transparent",cursor:"pointer",fontFamily:"Cairo",color:a?C.pink:C.textS,fontSize:13,fontWeight:a?600:400,textAlign:"right"}}
+            return(<button key={n.id} onClick={()=>{setPage(n.id);setNavOpen(false);}} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,marginBottom:2,background:a?`${C.pink}18`:"transparent",border:a?`1px solid ${C.pink}33`:"1px solid transparent",cursor:"pointer",fontFamily:"Cairo",color:a?C.pink:C.textS,fontSize:13,fontWeight:a?600:400,textAlign:"right"}}
               onMouseEnter={e=>{if(!a)e.currentTarget.style.background="rgba(255,255,255,0.04)"}}
               onMouseLeave={e=>{if(!a)e.currentTarget.style.background="transparent"}}>
               <span style={{fontSize:15}}>{n.icon}</span>{n.label}
@@ -2555,7 +2560,7 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
       </div>
 
       {/* Main content */}
-      <main style={{flex:1,marginRight:220,overflowY:"auto",minHeight:"100vh",paddingBottom:40}}>
+      <main className="wm-main" style={{flex:1,marginRight:220,overflowY:"auto",minHeight:"100vh",paddingBottom:40}}>
         {/* Top bar */}
         <div style={{padding:"18px 32px",borderBottom:`1px solid ${C.border}`,background:`${C.bg}ee`,backdropFilter:"blur(10px)",position:"sticky",top:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div style={{color:C.text,fontSize:16,fontWeight:700}}>مرحباً بك، {clientData.name} 👋</div>
@@ -2855,8 +2860,8 @@ function Login({onLogin}){
       <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
       <div style={{position:"absolute",width:600,height:600,borderRadius:"50%",background:"radial-gradient(circle, rgba(123,111,224,0.10) 0%, transparent 70%)",top:-200,right:-100,pointerEvents:"none"}}/>
       <div style={{position:"absolute",width:500,height:500,borderRadius:"50%",background:"radial-gradient(circle, rgba(232,121,160,0.08) 0%, transparent 70%)",bottom:-150,left:0,pointerEvents:"none"}}/>
-      <div style={{display:"flex",width:"100%",maxWidth:900,margin:"0 auto",minHeight:"100vh",opacity:mt?1:0,transition:"opacity .5s"}}>
-        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:60,borderLeft:`1px solid ${C.border}`,background:"rgba(13,21,38,0.5)"}}>
+      <div className="wm-login-wrap" style={{display:"flex",width:"100%",maxWidth:900,margin:"0 auto",minHeight:"100vh",opacity:mt?1:0,transition:"opacity .5s"}}>
+        <div className="wm-login-brand" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:60,borderLeft:`1px solid ${C.border}`,background:"rgba(13,21,38,0.5)"}}>
           <div style={{textAlign:"center",marginBottom:44}}>
             <svg width={60} height={60} viewBox="0 0 60 60" fill="none" style={{marginBottom:16,filter:"drop-shadow(0 0 18px rgba(232,121,160,0.4))"}}>
               <defs><linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E879A0"/><stop offset="100%" stopColor="#7B6FE0"/></linearGradient></defs>
@@ -2873,8 +2878,12 @@ function Login({onLogin}){
           ))}
           <div style={{marginTop:"auto",paddingTop:30,color:"rgba(255,255,255,0.2)",fontSize:11,textAlign:"center"}}>© 2025 وميض · بُني بواسطة أحمد علي</div>
         </div>
-        <div style={{width:420,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"50px 44px"}}>
+        <div className="wm-login-form" style={{width:420,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"50px 44px"}}>
           <div style={{width:"100%",animation:shake?"sh .5s ease":"none"}}>
+            <div className="wm-login-mobile-logo">
+              <svg width={36} height={36} viewBox="0 0 60 60" fill="none"><defs><linearGradient id="lgm" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E879A0"/><stop offset="100%" stopColor="#7B6FE0"/></linearGradient></defs><path d="M30 2 L36 22 L56 22 L40 35 L46 55 L30 43 L14 55 L20 35 L4 22 L24 22 Z" fill="url(#lgm)"/></svg>
+              <div><div style={{color:"white",fontSize:20,fontWeight:900,lineHeight:1}}>وميض</div><div style={{fontSize:8,fontWeight:700,letterSpacing:4,background:C.grad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>WAMEED</div></div>
+            </div>
             <div style={{marginBottom:28}}><div style={{fontSize:23,fontWeight:800,color:"white",marginBottom:5}}>تسجيل الدخول</div><div style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>أدخل بياناتك للوصول للنظام</div></div>
             <div style={{marginBottom:14}}>
               <label style={{display:"block",fontSize:12,fontWeight:600,color:"rgba(255,255,255,0.55)",marginBottom:6}}>البريد الإلكتروني</label>
@@ -2927,6 +2936,7 @@ export default function App(){
   const setUser = (u) => { setUserRaw(u); if(u) ls.set("w_currentUser", u); else ls.set("w_currentUser", null); };
   const [page, setPage] = useState("dashboard");
   const [dbReady, setDbReady] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   // ─── STATE (localStorage as persistence) ──────────────────────────────────
   const [users, setUsersRaw] = useState(() => ls.get("w_users", IU));
@@ -3324,13 +3334,18 @@ export default function App(){
   return (
     <div style={{minHeight:"100vh", background:C.bg, fontFamily:"Cairo", direction:"rtl", display:"flex"}}>
       <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
+      <div className={`wm-overlay${navOpen?" wm-open":""}`} onClick={()=>setNavOpen(false)}/>
+      <button className="wm-hamburger" onClick={()=>setNavOpen(v=>!v)} aria-label="فتح القائمة">
+        {navOpen ? "✕" : "☰"}
+      </button>
       <Sidebar page={page} setPage={setPage} user={user} onLogout={() => setUser(null)} unread={unread}
+        open={navOpen} onClose={()=>setNavOpen(false)}
         onAvatarSaved={(url)=>{
           setUser({...user, avatarUrl:url});
           setUsers(p=>p.map(u=>u.id===user.id?{...u,avatarUrl:url}:u));
         }}
       />
-      <main style={{flex:1, marginRight:230, overflowY:"auto", minHeight:"100vh", paddingBottom:40}}>
+      <main className="wm-main" style={{flex:1, marginRight:230, overflowY:"auto", minHeight:"100vh", paddingBottom:40}}>
         <div style={{position:"sticky",top:0,zIndex:50,background:`${C.bg}ee`,backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.border}`,padding:"9px 28px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span style={{fontSize:11,fontWeight:600,color:dbReady?C.green:C.orange}}>
             {dbReady ? "● متصل بـ Supabase" : "● محفوظ محلياً — يتزامن مع Supabase تلقائياً"}
