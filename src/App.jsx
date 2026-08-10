@@ -2825,7 +2825,7 @@ function Login({onLogin}){
       // 1. Check team members FIRST (local users from localStorage or initial data)
       const localUsers=JSON.parse(localStorage.getItem("w_users")||JSON.stringify(IU));
       const teamUser=localUsers.find(u=>u.email===em&&u.password===pw);
-      if(teamUser){onLogin({type:"team",...teamUser});setLoading(false);return;}
+      if(teamUser){onLogin({type:"team",...teamUser,avatarUrl:teamUser.avatarUrl||teamUser.avatar_url});setLoading(false);return;}
 
       // 2. Try Supabase Auth for team members
       if(window.__SB){
@@ -2833,7 +2833,7 @@ function Login({onLogin}){
           const {data,error}=await window.__SB.auth.signInWithPassword({email:em,password:pw});
           if(!error&&data?.user){
             const {data:profile}=await window.__SB.from("users").select("*").eq("email",em).single();
-            if(profile){onLogin({type:"team",...profile,avatar:profile.avatar||ini(profile.name)});setLoading(false);return;}
+            if(profile){onLogin({type:"team",...profile,avatar:profile.avatar||ini(profile.name),avatarUrl:profile.avatar_url});setLoading(false);return;}
           }
         }catch(e){}
       }
