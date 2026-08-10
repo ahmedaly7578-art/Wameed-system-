@@ -300,8 +300,8 @@ function Dashboard({clients,users,notifs,followups,tasks}){
           <span style={{color:C.green,fontSize:12,fontWeight:600}}>النظام يعمل</span>
         </div>
       </TB>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:20}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:20}}>
           <StC label="العملاء النشطين" value={active.length} icon="👥" color={C.pink} trend={12} sub={`${clients.filter(c=>c.status==="hold").length} موقوف`}/>
           <StC label="إجمالي الإيرادات" value={`${(rev/1000).toFixed(0)}k SAR`} icon="💰" color={C.green} trend={5}/>
           <StC label="متوسط ROAS" value={avgR} icon="📈" color={C.purple} trend={8}/>
@@ -317,7 +317,7 @@ function Dashboard({clients,users,notifs,followups,tasks}){
             </div>}
           </div>
         )}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14,marginBottom:20}}>
           <Card>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
               <div style={{color:C.text,fontSize:14,fontWeight:700}}>أداء الفريق — ROAS</div>
@@ -348,7 +348,7 @@ function Dashboard({clients,users,notifs,followups,tasks}){
             })}
           </Card>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14}}>
           <Card>
             <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:14}}>توزيع المنصات</div>
             {["Meta","Snapchat","TikTok","Google"].map(p=>{
@@ -424,12 +424,12 @@ function AIAnalysis({clients,campaigns,users}){
   return(
     <div>
       <TB title="AI تحليل الحملات 🤖" sub="تحليل ذكي بالذكاء الاصطناعي — اقتراحات وتوقعات وحلول"/>
-      <div style={{padding:"0 32px"}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
         <div style={{background:"rgba(123,111,224,0.08)",border:"1px solid rgba(123,111,224,0.25)",borderRadius:14,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:12}}>
           <span style={{fontSize:24}}>🤖</span>
           <div><div style={{color:C.purple,fontSize:13,fontWeight:700,marginBottom:3}}>مدعوم بـ Claude AI</div><div style={{color:"rgba(123,111,224,0.8)",fontSize:12}}>حدد عميلاً، واضغط "تحليل الآن" — الـ AI بيقرأ بيانات الحملات ويرجعلك تحليل كامل مع توصيات عملية</div></div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"320px 1fr",gap:20}}>
+        <div className="wm-split-320" style={{display:"grid",gridTemplateColumns:"320px 1fr",gap:20}}>
           {/* Left: selector + info */}
           <div>
             <Card>
@@ -522,14 +522,14 @@ function ChurnTracker({clients,users}){
   return(
     <div>
       <TB title="Churn Tracker 📉" sub="تتبع العملاء الملغيين وأسباب الإلغاء"/>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
           <StC label="إجمالي الملغيين" value={cancelled.length} icon="📉" color={C.red}/>
           <StC label="Churn Rate" value={`${churnRate}%`} icon="📊" color={C.orange}/>
           <StC label="العملاء النشطين" value={clients.filter(c=>c.status==="active").length} icon="✅" color={C.green}/>
           <StC label="Renewal Rate" value={`${(100-churnRate).toFixed(1)}%`} icon="🔄" color={C.purple}/>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14,marginBottom:20}}>
           <Card>
             <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:16}}>أسباب الإلغاء</div>
             {reasonCounts.length===0?<div style={{color:C.textM,fontSize:13,textAlign:"center",padding:"20px"}}>لا بيانات كافية</div>:reasonCounts.map(({r,count})=>{
@@ -603,7 +603,7 @@ function Targets({clients,campaigns,users,targets,setTargets}){
         <Btn onClick={saveTarget} style={{width:"100%",padding:13}}>✓ حفظ الأهداف</Btn>
       </Mdl>
       <TB title="الأهداف والإنجازات 🎯" sub="Targets vs Actuals — مايو 2025"/>
-      <div style={{padding:"0 32px"}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
         {mbs.map(m=>{
           const target=targets.find(t=>t.userId===m.id&&t.month==="2025-05");
           const actuals=getActuals(m.id);
@@ -619,7 +619,7 @@ function Targets({clients,campaigns,users,targets,setTargets}){
                 <Btn onClick={()=>{setEditUser(m);const t=targets.find(x=>x.userId===m.id&&x.month==="2025-05");if(t)setF({targetClients:t.targetClients,targetRoas:t.targetRoas,targetUpsell:t.targetUpsell,targetRenewal:t.targetRenewal});setEditOpen(true)}} color={`${C.purple}33`} style={{color:C.purple,fontSize:12}}>✏️ تعديل الأهداف</Btn>
               </div>
               {!target?<div style={{color:C.textM,fontSize:13,textAlign:"center",padding:"20px 0"}}>لم يتم تحديد أهداف — اضغط تعديل الأهداف</div>:(
-                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12}}>
                   {[["العملاء",actuals.clients,target.targetClients,clientPct,C.blue],["ROAS",actuals.roas,target.targetRoas,roasPct,C.green],["Upsell","—",target.targetUpsell,0,C.orange],["Renewal",`${Math.round(Math.random()*20+75)}%`,`${target.targetRenewal}%`,Math.round(Math.random()*30+70),C.purple]].map(([l,actual,tgt,p,co])=>(
                     <div key={l} style={{textAlign:"center",padding:"14px 10px",background:"rgba(255,255,255,0.03)",borderRadius:12}}>
                       <div style={{color:C.textM,fontSize:11,marginBottom:6}}>{l}</div>
@@ -659,8 +659,8 @@ function Scorecard({clients,campaigns,tasks,users}){
   return(
     <div>
       <TB title="Performance Scorecard 🏆" sub="نقاط أداء شهرية لكل موظف — مايو 2025"/>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:22}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:22}}>
           {scored.slice(0,3).map((u,i)=>(
             <Card key={u.id} s={{textAlign:"center",border:`1px solid ${medalColor(i)}44`}}>
               <div style={{fontSize:28,marginBottom:8}}>{i===0?"🥇":i===1?"🥈":"🥉"}</div>
@@ -733,14 +733,14 @@ function Satisfaction({clients,satisfaction,setSatisfaction,users}){
       <TB title="رضا العملاء ⭐" sub="تقييمات العملاء من بواباتهم ويدوياً">
         <Btn onClick={()=>setAddOpen(true)}>+ إضافة يدوي</Btn>
       </TB>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
           <StC label="متوسط التقييم" value={`${avgScore} ★`} icon="⭐" color={C.orange}/>
           <StC label="تقييمات إجمالية" value={satisfaction.length} icon="📝" color={C.blue}/>
           <StC label="ممتازون (5 ★)" value={satisfaction.filter(s=>s.score===5).length} icon="🌟" color={C.green}/>
           <StC label="يحتاجون متابعة (≤3)" value={satisfaction.filter(s=>s.score<=3).length} icon="⚠️" color={C.red}/>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14,marginBottom:20}}>
           <Card>
             <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:16}}>توزيع التقييمات</div>
             {[5,4,3,2,1].map(n=>{
@@ -817,8 +817,8 @@ function RenewalSystem({clients,users}){
   return(
     <div>
       <TB title="نظام التجديد 🔄" sub="تتبع التجديدات والتنبيهات"/>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
           <StC label="ينتهون خلال 7 أيام" value={renew7.length} icon="🚨" color={C.red}/>
           <StC label="ينتهون خلال 14 يوم" value={renew14.length} icon="⚠️" color={C.orange}/>
           <StC label="Renewal Rate" value={`${(100-churnRate).toFixed(1)}%`} icon="🔄" color={C.green}/>
@@ -926,7 +926,7 @@ function AddClientModal({open,onClose,onAdd,users}){
       </div>
 
       {step===1&&<>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}>
           <Inp label="اسم العميل" value={f.name} onChange={v=>s("name",v)} req mb={0} placeholder="متجر النور"/>
           <Inp label="الباقة الشهرية (SAR)" value={f.pkg} onChange={v=>s("pkg",v)} type="number" req mb={0} placeholder="3000"/>
         </div>
@@ -936,7 +936,7 @@ function AddClientModal({open,onClose,onAdd,users}){
             <button key={p} onClick={()=>tp(p)} style={{padding:"7px 16px",borderRadius:20,fontFamily:"Cairo",fontSize:12,fontWeight:600,cursor:"pointer",border:"1px solid",background:sel?`${PC[p]||C.purple}22`:"rgba(255,255,255,0.03)",color:sel?PC[p]||C.purple:C.textS,borderColor:sel?`${PC[p]||C.purple}55`:C.border}}>{p}</button>
           );})}
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}>
           <Sel label="الحالة" value={f.status} onChange={v=>s("status",v)} opts={[{v:"active",l:"نشط"},{v:"hold",l:"موقوف"},{v:"cancelled",l:"ملغي"}]} mb={0}/>
           <Inp label="ROAS الحالي (اختياري)" value={f.roas} onChange={v=>s("roas",v)} type="number" placeholder="3.5" mb={0}/>
         </div>
@@ -945,12 +945,12 @@ function AddClientModal({open,onClose,onAdd,users}){
       </>}
 
       {step===2&&<>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
           <Sel label="Media Buyer" value={f.mb} onChange={v=>s("mb",v)} opts={mbs.map(u=>({v:u.id,l:u.name}))} req/>
           <Sel label="Social Media" value={f.sm} onChange={v=>s("sm",v)} opts={sms.map(u=>({v:u.id,l:u.name}))} ph="اختياري"/>
           <Sel label="Account Manager" value={f.am} onChange={v=>s("am",v)} opts={ams.map(u=>({v:u.id,l:u.name}))} ph="اختياري"/>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}>
           <Inp label="تاريخ البداية" value={f.start} onChange={v=>s("start",v)} type="date" req mb={0}/>
           <Inp label="تاريخ الانتهاء" value={f.end} onChange={v=>s("end",v)} type="date" req mb={0}/>
         </div>
@@ -1067,7 +1067,7 @@ function ClientDetail({c,users,onBack,notes,setNotes,satisfaction,campaigns,setC
           </div>
         </div>
 
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:22}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:22}}>
           {[
             ["الإنفاق",`${(c.spend||0).toLocaleString()} SAR`,C.orange],
             ["الباقة",`${(c.pkg||0).toLocaleString()} SAR`,C.green],
@@ -1092,7 +1092,7 @@ function ClientDetail({c,users,onBack,notes,setNotes,satisfaction,campaigns,setC
 
       <div style={{padding:"22px 32px"}}>
         {tab==="overview"&&(
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14}}>
             <Card>
               <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:14}}>معلومات العميل</div>
               {[
@@ -1135,7 +1135,7 @@ function ClientDetail({c,users,onBack,notes,setNotes,satisfaction,campaigns,setC
                     <div style={{display:"flex",gap:8,alignItems:"center"}}><PT name={camp.platform}/><span style={{color:C.textM,fontSize:12}}>{fmtDate(camp.week)}</span></div>
                     <span style={{color:(camp.roas||0)>=3?C.green:C.orange,fontSize:18,fontWeight:800}}>ROAS {camp.roas||"—"}</span>
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:8}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8}}>
                     {[
                       ["Spend",`${(camp.spend||0).toLocaleString()} SAR`,C.orange],
                       ["Clicks",(camp.clicks||0).toLocaleString(),C.blue],
@@ -1263,7 +1263,7 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
       <TB title="العملاء 👥" sub={`${clients.length} إجمالي · ${clients.filter(c=>c.status==="active").length} نشط · ${clients.filter(c=>c.email).length} لديهم بوابة`}>
         <Btn onClick={()=>setAddOpen(true)}>+ إضافة عميل</Btn>
       </TB>
-      <div style={{padding:"0 32px"}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
         <div style={{display:"flex",gap:10,marginBottom:18,flexWrap:"wrap",alignItems:"center"}}>
           <div style={{position:"relative",flex:1,maxWidth:300}}>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ابحث بالاسم أو MB..." style={{width:"100%",padding:"10px 16px 10px 36px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,fontSize:13,fontFamily:"Cairo",outline:"none",boxSizing:"border-box"}}/>
@@ -1334,23 +1334,23 @@ function Capacity({clients,users}){
   return(
     <div>
       <TB title="Capacity الفريق ⚡" sub="توزيع العملاء وحمل كل عضو"/>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:22}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:22}}>
           <StC label="Media Buyers" value={mbs.length} icon="📊" color={C.purple}/>
           <StC label="متوسط الـ Capacity" value={`${avgP}%`} icon="⚡" color={C.orange}/>
           <StC label="متاح لعملاء جدد" value={mbs.filter(m=>pct(clients.filter(c=>c.mb===m.id&&c.status==="active").length,10)<90).length} icon="✅" color={C.green}/>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:22}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:22}}>
           {mbs.map(m=>{const ac=clients.filter(c=>c.mb===m.id&&c.status==="active").length;const hold=clients.filter(c=>c.mb===m.id&&c.status==="hold").length;const p=pct(ac,10);const cp=capC(p);const myC=clients.filter(c=>c.mb===m.id&&c.status==="active");
             return(<Card key={m.id}>
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}><Av text={m.avatar} img={m.avatarUrl} color={RC.media_buyer} size={44}/><div style={{flex:1}}><div style={{color:C.text,fontSize:14,fontWeight:700}}>{m.name}</div><Bdg label="Media Buyer" color={RC.media_buyer}/></div><div style={{textAlign:"center"}}><div style={{color:cp,fontSize:22,fontWeight:800,lineHeight:1}}>{p}%</div><div style={{color:C.textM,fontSize:10}}>ممتلئ</div></div></div>
               <div style={{height:10,background:"rgba(255,255,255,0.07)",borderRadius:5,overflow:"hidden",marginBottom:12}}><div style={{height:"100%",width:`${p}%`,background:cp,borderRadius:5}}/></div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>{[["نشط",ac,C.green],["هولد",hold,C.orange],["الحد",10,C.textS]].map(([l,v,co])=><div key={l} style={{textAlign:"center",padding:"8px 4px",background:"rgba(255,255,255,0.03)",borderRadius:8}}><div style={{color:co,fontSize:18,fontWeight:800}}>{v}</div><div style={{color:C.textM,fontSize:10}}>{l}</div></div>)}</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:8,marginBottom:12}}>{[["نشط",ac,C.green],["هولد",hold,C.orange],["الحد",10,C.textS]].map(([l,v,co])=><div key={l} style={{textAlign:"center",padding:"8px 4px",background:"rgba(255,255,255,0.03)",borderRadius:8}}><div style={{color:co,fontSize:18,fontWeight:800}}>{v}</div><div style={{color:C.textM,fontSize:10}}>{l}</div></div>)}</div>
               <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10}}><div style={{color:C.textM,fontSize:11,marginBottom:6}}>العملاء الحاليين</div>{myC.slice(0,3).map(c=><div key={c.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:`1px solid rgba(255,255,255,0.04)`}}><span style={{color:C.textS,fontSize:11}}>{c.name}</span><span style={{color:c.roas>=3?C.green:C.orange,fontSize:11,fontWeight:700}}>ROAS {c.roas}</span></div>)}{myC.length===0&&<div style={{color:C.textM,fontSize:11}}>لا يوجد عملاء</div>}</div>
             </Card>);
           })}
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14}}>
           {[["SOCIAL MEDIA",users.filter(u=>u.role==="social_media"),"social_media"],["ACCOUNT MANAGER",users.filter(u=>u.role==="account_manager"),"account_manager"]].map(([title,list,role])=>(
             <div key={role}>
               <div style={{color:C.textS,fontSize:11,fontWeight:600,marginBottom:10,textTransform:"uppercase",letterSpacing:".06em"}}>{title}</div>
@@ -1385,13 +1385,13 @@ function FollowUp({clients,users,followups,setFollowups,addNotif,currentUser}){
           {mbs.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
       </TB>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:22}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:22}}>
           <StC label="متابَعين اليوم" value={filtered.filter(c=>getDays(c.id)===0).length} icon="✅" color={C.green}/>
           <StC label="أمس (تأخر يوم)" value={filtered.filter(c=>getDays(c.id)===1).length} icon="⏰" color={C.orange}/>
           <StC label="متأخر أكثر من يوم" value={filtered.filter(c=>getDays(c.id)>1).length} icon="🚨" color={C.red}/>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14}}>
           {filtered.map(c=>{
             const mb=users.find(u=>u.id===c.mb);const sm=users.find(u=>u.id===c.sm);const days=getDays(c.id);const latest=getLatest(c.id);
             const todayFUs=followups.filter(f=>f.clientId===c.id&&f.date===todayStr());const monthFUs=followups.filter(f=>f.clientId===c.id);
@@ -1455,8 +1455,8 @@ function ClientFU({client,users,followups,setFollowups,addNotif,currentUser,onBa
         {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
         <div style={{display:"flex",gap:10}}><Btn onClick={submit} style={{flex:1,padding:13}}>✓ حفظ</Btn><button onClick={()=>{setAddOpen(false);setText("");setImages([]);setErr("")}} style={{padding:"12px 20px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:12,color:C.textS,fontSize:14,fontFamily:"Cairo",cursor:"pointer"}}>إلغاء</button></div>
       </Mdl>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"200px 1fr",gap:20}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div className="wm-split-200" style={{display:"grid",gridTemplateColumns:"200px 1fr",gap:20}}>
           <div>
             <div style={{color:C.textS,fontSize:11,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:".05em"}}>تقويم الشهر</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
@@ -1505,19 +1505,19 @@ function AddCreativeModal({open,onClose,onAdd,onSave,edit,clients,users}){
   };
   return(
     <Mdl open={open} onClose={onClose} title={edit?"✏️ تعديل تاسك كريتيف":"🎨 إضافة تاسك كريتيف"} width={620}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}>
         <Inp label="الأجنسي / Agency" value={f.agency} onChange={v=>s("agency",v)} req mb={0} placeholder="Ataa"/>
         <Inp label="الديبارتمنت" value={f.department} onChange={v=>s("department",v)} mb={0} placeholder="Social"/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Sel label="العميل" value={f.clientId} onChange={v=>{s("clientId",v);const c=clients.find(x=>x.id===+v);if(c)s("clientName",c.name);}} opts={clients.map(c=>({v:c.id,l:c.name}))} ph="اختياري" mb={0}/>
         <Inp label="اسم العميل (لو مش موجود بالنظام)" value={f.clientName} onChange={v=>s("clientName",v)} mb={0}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Inp label="Strategy Link" value={f.strategyLink} onChange={v=>s("strategyLink",v)} mb={0} placeholder="https://..."/>
         <Inp label="Website Link" value={f.websiteLink} onChange={v=>s("websiteLink",v)} mb={0} placeholder="https://..."/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Inp label="تاريخ التاسك" value={f.taskDate} onChange={v=>s("taskDate",v)} type="date" req mb={0}/>
         <div>
           <Inp label="الديدلاين (تلقائي: +4 أيام)" value={f.deadLine} onChange={v=>s("deadLine",v)} type="date" mb={0}/>
@@ -1527,19 +1527,19 @@ function AddCreativeModal({open,onClose,onAdd,onSave,edit,clients,users}){
         <label style={{display:"block",fontSize:12,fontWeight:600,color:C.textS,marginBottom:6}}>Notes / Data</label>
         <textarea value={f.notes} onChange={e=>s("notes",e.target.value)} style={{width:"100%",padding:"10px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,outline:"none",fontFamily:"Cairo",boxSizing:"border-box",resize:"vertical",minHeight:60,direction:"rtl"}}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Sel label="المصمم" value={f.designerId} onChange={v=>{s("designerId",v);const d=designers.find(x=>x.id===+v);if(d)s("designerName",d.name);}} opts={designers.map(d=>({v:d.id,l:d.name}))} ph="اختر مصمم" mb={0}/>
         <Sel label="Forum" value={f.forum} onChange={v=>s("forum",v)} opts={FORUMS.map(x=>({v:x,l:x}))} mb={0}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Inp label="No of Sizes" value={f.noOfSizes} onChange={v=>s("noOfSizes",v)} mb={0} placeholder="2 Platforms"/>
         <Inp label="Size" value={f.size} onChange={v=>s("size",v)} mb={0} placeholder="Snap+Insta"/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Sel label="الحالة" value={f.status} onChange={v=>s("status",v)} opts={Object.entries(CSTATUS).map(([v,l])=>({v,l}))} mb={0}/>
         <Inp label="Upload Folder" value={f.uploadFolder} onChange={v=>s("uploadFolder",v)} mb={0} placeholder="رابط الفولدر"/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Inp label="Upload Date" value={f.uploadDate} onChange={v=>s("uploadDate",v)} type="date" mb={0}/>
         <Inp label="Time" value={f.timeNote} onChange={v=>s("timeNote",v)} mb={0} placeholder="Same"/>
       </div>
@@ -1576,8 +1576,8 @@ function CreativeTasks({tasks,setTasks,clients,users,currentUser}){
       <TB title="الكريتيف 🎨" sub={`${tasks.length} تاسك · ${lateCount} متأخر · متزامن مع Google Sheet`}>
         <Btn onClick={()=>setAddOpen(true)}>+ تاسك جديد</Btn>
       </TB>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
           <StC label="إجمالي التاسكات" value={tasks.length} icon="🎨" color={C.purple}/>
           <StC label="جاري" value={tasks.filter(t=>t.status==="in_progress").length} icon="🔄" color={C.blue}/>
           <StC label="تم" value={tasks.filter(t=>t.done).length} icon="✅" color={C.green}/>
@@ -1654,23 +1654,23 @@ function AddMotionModal({open,onClose,onAdd,onSave,edit,clients,users}){
   };
   return(
     <Mdl open={open} onClose={onClose} title={edit?"✏️ تعديل تاسك موشن":"🎬 إضافة تاسك موشن"} width={620}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}>
         <Sel label="Task Owner" value={f.taskOwner} onChange={v=>s("taskOwner",v)} opts={users.map(u=>({v:u.name,l:u.name}))} req mb={0} ph="اختر من المستخدمين"/>
         <Inp label="Member" value={f.member} onChange={v=>s("member",v)} mb={0} placeholder="اسم العضو (اختياري)"/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Sel label="الأجنسي / Agency" value={f.agency} onChange={v=>s("agency",v)} opts={MAGENCIES.map(x=>({v:x,l:x}))} req mb={0}/>
         <Sel label="الديبارتمنت" value={f.department} onChange={v=>s("department",v)} opts={MDEPTS.map(x=>({v:x,l:x}))} mb={0}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Sel label="العميل" value={f.clientId} onChange={v=>{s("clientId",v);const c=clients.find(x=>x.id===+v);if(c)s("clientName",c.name);}} opts={clients.map(c=>({v:c.id,l:c.name}))} ph="اختياري" mb={0}/>
         <Inp label="اسم العميل (لو مش موجود بالنظام)" value={f.clientName} onChange={v=>s("clientName",v)} mb={0}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Inp label="Strategy Link" value={f.strategyLink} onChange={v=>s("strategyLink",v)} mb={0} placeholder="https://..."/>
         <Inp label="Website Link" value={f.websiteLink} onChange={v=>s("websiteLink",v)} mb={0} placeholder="https://..."/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Inp label="تاريخ التاسك" value={f.taskDate} onChange={v=>s("taskDate",v)} type="date" req mb={0}/>
         <Inp label="الديدلاين (تلقائي: +4 أيام)" value={f.deadLine} onChange={v=>s("deadLine",v)} type="date" mb={0}/>
       </div>
@@ -1678,15 +1678,15 @@ function AddMotionModal({open,onClose,onAdd,onSave,edit,clients,users}){
         <label style={{display:"block",fontSize:12,fontWeight:600,color:C.textS,marginBottom:6}}>Notes / Data</label>
         <textarea value={f.notes} onChange={e=>s("notes",e.target.value)} style={{width:"100%",padding:"10px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,outline:"none",fontFamily:"Cairo",boxSizing:"border-box",resize:"vertical",minHeight:60,direction:"rtl"}}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Sel label="Forum" value={f.forum} onChange={v=>s("forum",v)} opts={MFORUMS.map(x=>({v:x,l:x}))} mb={0}/>
         <Sel label="Size" value={f.size} onChange={v=>s("size",v)} opts={MSIZES.map(x=>({v:x,l:x}))} mb={0}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Sel label="الحالة" value={f.status} onChange={v=>s("status",v)} opts={Object.entries(MSTATUS).map(([v,l])=>({v,l}))} mb={0}/>
         <Inp label="N.O" value={f.nO} onChange={v=>s("nO",v)} mb={0}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}}>
         <Inp label="Upload Folder" value={f.uploadFolder} onChange={v=>s("uploadFolder",v)} mb={0} placeholder="رابط الفولدر"/>
         <Inp label="Time" value={f.time} onChange={v=>s("time",v)} mb={0} placeholder="Same"/>
       </div>
@@ -1722,8 +1722,8 @@ function MotionTasks({tasks,setTasks,clients,users,currentUser}){
       <TB title="الموشن 🎬" sub={`${tasks.length} تاسك · ${lateCount} متأخر · متزامن مع Google Sheet`}>
         <Btn onClick={()=>setAddOpen(true)}>+ تاسك جديد</Btn>
       </TB>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
           <StC label="إجمالي التاسكات" value={tasks.length} icon="🎬" color={C.purple}/>
           <StC label="جاري" value={tasks.filter(t=>t.status==="In Progress").length} icon="🔄" color={C.blue}/>
           <StC label="تم" value={tasks.filter(t=>t.done).length} icon="✅" color={C.green}/>
@@ -1840,7 +1840,7 @@ function MediaRenewals({tasks,setTasks,tabInfo,onRollover,rollingOver,clients,us
           <button onClick={()=>setAddOpen(true)} style={{padding:"10px 16px",borderRadius:10,background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,color:C.textS,fontSize:13,fontFamily:"Cairo",cursor:"pointer"}}>+ إضافة يدوي</button>
         </div>}
       </TB>
-      <div style={{padding:"0 32px"}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
         {tabInfo?.exists===false&&(
           <Card s={{textAlign:"center",padding:"40px",marginBottom:20}}>
             <div style={{fontSize:34,marginBottom:10}}>📅</div>
@@ -1933,13 +1933,13 @@ function AddCampaignModal({open,onClose,onAdd,clients,currentUser}){
       <div style={{background:`${C.purple}10`,border:`1px solid ${C.purple}25`,borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:12,color:C.textS}}>
         أدخل الأرقام من لوحات المنصات مباشرة — Meta Ads / TikTok Ads / Snapchat Ads / Google Ads
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
         <Sel label="العميل" value={f.clientId} onChange={v=>sv("clientId",v)} opts={myClients.map(c=>({v:c.id,l:c.name}))} req/>
         <Sel label="المنصة" value={f.platform} onChange={v=>sv("platform",v)} opts={PLATS.map(p=>({v:p,l:p}))} req/>
         <Inp label="تاريخ الأسبوع" value={f.week} onChange={v=>sv("week",v)} type="date" req mb={0}/>
       </div>
       <div style={{margin:"14px 0 10px",fontSize:12,fontWeight:600,color:C.textS,borderBottom:`1px solid ${C.border}`,paddingBottom:6}}>أرقام الأداء</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10}}>
         <Inp label="💸 الإنفاق (SAR)" value={f.spend} onChange={v=>sv("spend",v)} type="number" placeholder="5000" req mb={0}/>
         <Inp label="🖱️ Clicks" value={f.clicks} onChange={v=>sv("clicks",v)} type="number" placeholder="3000" mb={0}/>
         <Inp label="👁️ Impressions" value={f.impressions} onChange={v=>sv("impressions",v)} type="number" placeholder="350000" mb={0}/>
@@ -1981,8 +1981,8 @@ function Campaigns({campaigns,setCampaigns,clients,users,currentUser}){
       <TB title="الحملات والأداء 📊" sub="أرقام الحملات عبر كل المنصات">
         <Btn onClick={()=>setAddOpen(true)}>+ إضافة بيانات حملة</Btn>
       </TB>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
           <StC label="الإنفاق الكلي" value={`${(filtered.reduce((s,c)=>s+c.spend,0)/1000).toFixed(0)}k SAR`} icon="💸" color={C.orange}/>
           <StC label="متوسط ROAS" value={(filtered.length?filtered.reduce((s,c)=>s+c.roas,0)/filtered.length:0).toFixed(1)} icon="📈" color={C.green}/>
           <StC label="إجمالي المبيعات" value={`${(filtered.reduce((s,c)=>s+(c.purchaseValue||0),0)/1000).toFixed(0)}k SAR`} icon="🛒" color={C.purple}/>
@@ -2014,7 +2014,7 @@ function Campaigns({campaigns,setCampaigns,clients,users,currentUser}){
                   <button onClick={()=>setCampaigns(p=>p.filter(x=>x.id!==camp.id))} style={{padding:"4px 10px",borderRadius:7,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>
                 </div>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:8}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8}}>
                 {[["Spend",`${(camp.spend||0).toLocaleString()} SAR`,C.orange],["Clicks",(camp.clicks||0).toLocaleString(),C.blue],["Impressions",((camp.impressions||0)/1000).toFixed(0)+"k",C.purple],["CTR",`${camp.ctr||0}%`,C.teal],["Purchases",camp.purchases||0,C.green],["P.Value",`${((camp.purchaseValue||0)/1000).toFixed(0)}k SAR`,C.pink]].map(([l,v,co])=>(
                   <div key={l} style={{textAlign:"center",padding:"8px 4px",background:"rgba(255,255,255,0.03)",borderRadius:8}}>
                     <div style={{color:co,fontSize:13,fontWeight:700,marginBottom:2}}>{v}</div>
@@ -2051,15 +2051,15 @@ function Tasks({tasks,setTasks,clients,users,currentUser}){
         <Inp label="عنوان المهمة" value={f.title} onChange={v=>sf("title",v)} req placeholder="مثال: رفع تقرير أسبوعي"/>
         <Sel label="المسؤول" value={f.assignedTo} onChange={v=>sf("assignedTo",v)} opts={users.filter(u=>u.role!=="admin").map(u=>({v:u.id,l:`${u.name} (${RL[u.role]})`}))} req/>
         <Sel label="العميل" value={f.clientId} onChange={v=>sf("clientId",v)} opts={clients.filter(c=>c.status==="active").map(c=>({v:c.id,l:c.name}))} ph="غير مرتبط"/>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="تاريخ التسليم" value={f.due} onChange={v=>sf("due",v)} type="date" req mb={0}/><Sel label="الأولوية" value={f.priority} onChange={v=>sf("priority",v)} opts={[{v:"high",l:"عالية 🔴"},{v:"medium",l:"متوسطة 🟡"},{v:"low",l:"منخفضة 🟢"}]} mb={0}/></div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}><Inp label="تاريخ التسليم" value={f.due} onChange={v=>sf("due",v)} type="date" req mb={0}/><Sel label="الأولوية" value={f.priority} onChange={v=>sf("priority",v)} opts={[{v:"high",l:"عالية 🔴"},{v:"medium",l:"متوسطة 🟡"},{v:"low",l:"منخفضة 🟢"}]} mb={0}/></div>
         {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginTop:14,marginBottom:0,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
         <div style={{display:"flex",gap:10,marginTop:14}}><Btn onClick={add} style={{flex:1,padding:13}}>✓ إضافة</Btn><button onClick={()=>setAddOpen(false)} style={{padding:"12px 20px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:12,color:C.textS,fontSize:14,fontFamily:"Cairo",cursor:"pointer"}}>إلغاء</button></div>
       </Mdl>
       <TB title="المهام اليومية ✅" sub={`${tasks.length} إجمالي · ${tasks.filter(t=>t.status==="late").length} متأخرة`}>
         <Btn onClick={()=>setAddOpen(true)}>+ إضافة مهمة</Btn>
       </TB>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
           {[["قيد الانتظار",tasks.filter(t=>t.status==="pending").length,C.orange,"⏳"],["جارية",tasks.filter(t=>t.status==="inprogress").length,C.blue,"🔄"],["مكتملة",tasks.filter(t=>t.status==="done").length,C.green,"✅"],["متأخرة",tasks.filter(t=>t.status==="late"||new Date(t.due)<new Date()&&t.status!=="done").length,C.red,"🚨"]].map(([l,v,co,ic])=><StC key={l} label={l} value={v} icon={ic} color={co}/>)}
         </div>
         <div style={{display:"flex",gap:8,marginBottom:16}}>{["all","pending","inprogress","done","late"].map(s=><button key={s} onClick={()=>setFilter(s)} style={{padding:"8px 14px",borderRadius:20,fontFamily:"Cairo",fontSize:12,cursor:"pointer",border:"1px solid",background:filter===s?`${C.pink}18`:C.bgCard,color:filter===s?C.pink:C.textS,borderColor:filter===s?`${C.pink}44`:C.border}}>{s==="all"?"الكل":TSL[s]}</button>)}</div>
@@ -2115,8 +2115,8 @@ function Reports({clients,campaigns,users}){
           📊 تصدير Excel
         </button>
       </TB>
-      <div style={{padding:"0 32px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:22}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:22}}>
           <StC label="الإنفاق الكلي" value={`${(campaigns.reduce((s,c)=>s+c.spend,0)/1000).toFixed(0)}k SAR`} icon="💸" color={C.orange}/>
           <StC label="إجمالي المبيعات" value={`${(campaigns.reduce((s,c)=>s+(c.purchaseValue||0),0)/1000).toFixed(0)}k SAR`} icon="🛒" color={C.green}/>
           <StC label="متوسط ROAS" value={(campaigns.length?campaigns.reduce((s,c)=>s+c.roas,0)/campaigns.length:0).toFixed(1)} icon="📈" color={C.purple}/>
@@ -2147,7 +2147,7 @@ function Reports({clients,campaigns,users}){
                 }} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",background:`${C.green}18`,border:`1px solid ${C.green}33`,borderRadius:10,color:C.green,fontSize:12,fontWeight:700,fontFamily:"Cairo",cursor:"pointer"}}>📊 Excel</button>
               </div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:12}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:12}}>
               {[["الإنفاق",`${totalSpend.toLocaleString()} SAR`,C.orange],["المبيعات",`${totalSales.toLocaleString()} SAR`,C.green],["الطلبات",campData.reduce((s,c)=>s+c.purchases,0),C.blue],["الحملات",campData.length,C.purple]].map(([l,v,co])=>(
                 <div key={l} style={{textAlign:"center",padding:"10px",background:"rgba(255,255,255,0.03)",borderRadius:10}}><div style={{color:co,fontSize:15,fontWeight:800,marginBottom:2}}>{v}</div><div style={{color:C.textM,fontSize:11}}>{l}</div></div>
               ))}
@@ -2227,7 +2227,7 @@ function Payroll({users,clients,payroll,setPayroll}){
           <div style={{color:C.text,fontSize:13,fontWeight:600}}>{users.find(u=>u.id===editId)?.name}</div>
           <div style={{color:C.textM,fontSize:11}}>{RL[users.find(u=>u.id===editId)?.role]}</div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}>
           <Inp label="الراتب الأساسي (SAR)" value={f.base} onChange={v=>sf("base",v)} type="number" placeholder="5000" mb={0}/>
           <Inp label="الكوميشن (SAR)" value={f.commission} onChange={v=>sf("commission",v)} type="number" placeholder="600" mb={0}/>
           <Inp label="البونص (SAR)" value={f.bonus} onChange={v=>sf("bonus",v)} type="number" placeholder="500" mb={0}/>
@@ -2247,7 +2247,7 @@ function Payroll({users,clients,payroll,setPayroll}){
           <button onClick={printPayroll} style={{display:"flex",alignItems:"center",gap:7,padding:"9px 14px",background:C.grad,border:"none",borderRadius:12,color:"white",fontSize:12,fontWeight:700,fontFamily:"Cairo",cursor:"pointer"}}>🖨️ PDF طباعة</button>
         </div>
       </TB>
-      <div style={{padding:"0 32px"}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
         <div style={{background:"rgba(248,113,113,0.06)",border:"1px solid rgba(248,113,113,0.2)",borderRadius:12,padding:"12px 16px",marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:18}}>🔒</span><div style={{color:"rgba(248,113,113,0.9)",fontSize:12}}>هذه الصفحة مرئية للمدير فقط</div></div>
           <div style={{color:C.text,fontSize:14,fontWeight:700}}>إجمالي الرواتب: <span style={{color:C.green}}>{totalNet.toLocaleString()} SAR</span></div>
@@ -2340,11 +2340,11 @@ function TeamMgmt({users,setUsers}){
       <TB title="إدارة الفريق 🧑‍💼" sub={`${users.filter(u=>u.role!=="admin").length} موظف`}>
         <Btn onClick={()=>{setF({name:"",role:"media_buyer",email:"",password:""});setErr("");setEdit(null);setOpen(true)}}>+ إضافة</Btn>
       </TB>
-      <div style={{padding:"0 32px"}}>
+      <div className="wm-page" style={{padding:"0 32px"}}>
         {[["admin","مديرو النظام","👑"],["media_buyer","Media Buyers","📊"],["social_media","Social Media","📱"],["account_manager","Account Managers","📋"],["designer","Designers","🎨"]].map(([role,label,icon])=>(
           <div key={role} style={{marginBottom:24}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}><span style={{fontSize:16}}>{icon}</span><div style={{color:C.textS,fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</div><Bdg label={`${users.filter(u=>u.role===role).length}`} color={RC[role]}/></div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
               {users.filter(u=>u.role===role).map(u=>(
                 <Card key={u.id}>
                   <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}><Av text={u.avatar} img={u.avatarUrl} color={RC[u.role]} size={44}/><div style={{flex:1,minWidth:0}}><div style={{color:C.text,fontSize:13,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}</div><div style={{color:RC[u.role],fontSize:10,fontWeight:500}}>{RL[u.role]}</div></div></div>
@@ -2562,7 +2562,7 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
       {/* Main content */}
       <main className="wm-main" style={{flex:1,marginRight:220,overflowY:"auto",minHeight:"100vh",paddingBottom:40}}>
         {/* Top bar */}
-        <div style={{padding:"18px 32px",borderBottom:`1px solid ${C.border}`,background:`${C.bg}ee`,backdropFilter:"blur(10px)",position:"sticky",top:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div className="wm-topbar" style={{padding:"18px 32px",borderBottom:`1px solid ${C.border}`,background:`${C.bg}ee`,backdropFilter:"blur(10px)",position:"sticky",top:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div style={{color:C.text,fontSize:16,fontWeight:700}}>مرحباً بك، {clientData.name} 👋</div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <div style={{color:C.textS,fontSize:12}}>آخر تحديث: اليوم</div>
@@ -2580,7 +2580,7 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
               <div style={{color:C.textS,fontSize:13,marginBottom:24}}>جميع الأرقام منذ بداية التعامل · {clientData.platforms.join(" · ")}</div>
 
               {/* Main KPIs */}
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:24}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:24}}>
                 {[
                   {label:"متوسط ROAS",value:avgROAS,icon:"📈",color:avgROAS>=3?C.green:C.orange,sub:"عائد على الإنفاق"},
                   {label:"إجمالي المبيعات",value:`${totalSales.toLocaleString()} SAR`,icon:"💰",color:C.green,sub:"قيمة المبيعات الكلية"},
@@ -2642,7 +2642,7 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
                       <div style={{fontSize:11,color:c.roas>=3?C.green:C.orange,background:c.roas>=3?`${C.green}18`:`${C.orange}18`,border:`1px solid ${c.roas>=3?C.green:C.orange}33`,borderRadius:8,padding:"3px 8px"}}>{c.roas>=4?"ممتاز":c.roas>=3?"جيد":"يحتاج تحسين"}</div>
                     </div>
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:12}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,marginBottom:12}}>
                     {[["الإنفاق",`${c.spend.toLocaleString()} SAR`,C.orange],["إجمالي المبيعات",`${(c.purchaseValue||0).toLocaleString()} SAR`,C.green],["عدد الطلبات",c.purchases,C.purple]].map(([l,v,co])=>(
                       <div key={l} style={{textAlign:"center",padding:"14px",background:"rgba(255,255,255,0.03)",borderRadius:12}}>
                         <div style={{color:co,fontSize:18,fontWeight:800,marginBottom:4}}>{v}</div>
@@ -2650,7 +2650,7 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
                       </div>
                     ))}
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
                     {[["Clicks",c.clicks.toLocaleString()],["Impressions",(c.impressions/1000).toFixed(0)+"k"],["CTR",c.ctr+"%"],["CPM",c.cpm+" SAR"]].map(([l,v])=>(
                       <div key={l} style={{textAlign:"center",padding:"10px 4px",background:"rgba(255,255,255,0.02)",borderRadius:8,border:`1px solid ${C.border}`}}>
                         <div style={{color:C.text,fontSize:13,fontWeight:700,marginBottom:2}}>{v}</div>
@@ -2782,7 +2782,7 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
             <div>
               <div style={{color:C.text,fontSize:20,fontWeight:800,marginBottom:6}}>تفاصيل الاشتراك</div>
               <div style={{color:C.textS,fontSize:13,marginBottom:24}}>معلومات باقتك وتواريخ الاشتراك</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16}}>
                 <Card>
                   <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:16}}>بيانات الباقة</div>
                   {[["اسم الباقة","باقة "+clientData.pkg.toLocaleString()+" SAR"],["القيمة الشهرية",clientData.pkg.toLocaleString()+" SAR"],["المنصات",clientData.platforms.join(" · ")],["تاريخ البداية",fmtDate(clientData.start)],["تاريخ الانتهاء",fmtDate(clientData.end)],["الحالة",clientData.status==="active"?"✅ نشط":"⏸ موقوف"]].map(([l,v],i)=>(
@@ -3346,7 +3346,7 @@ export default function App(){
         }}
       />
       <main className="wm-main" style={{flex:1, marginRight:230, overflowY:"auto", minHeight:"100vh", paddingBottom:40}}>
-        <div style={{position:"sticky",top:0,zIndex:50,background:`${C.bg}ee`,backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.border}`,padding:"9px 28px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div className="wm-topbar" style={{position:"sticky",top:0,zIndex:50,background:`${C.bg}ee`,backdropFilter:"blur(10px)",borderBottom:`1px solid ${C.border}`,padding:"9px 28px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span style={{fontSize:11,fontWeight:600,color:dbReady?C.green:C.orange}}>
             {dbReady ? "● متصل بـ Supabase" : "● محفوظ محلياً — يتزامن مع Supabase تلقائياً"}
           </span>
