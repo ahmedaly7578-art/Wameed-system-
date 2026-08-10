@@ -121,3 +121,16 @@ html, body, #root { overflow-x: hidden; }
     margin-bottom: 28px;
   }
 }
+
+/* Page content padding + sticky top bars: shrink on mobile and leave room for the hamburger */
+@media (max-width: 900px) {
+  .wm-page { padding: 0 16px !important; }
+  .wm-topbar { padding-left: 16px !important; padding-right: 60px !important; }
+}
+
+/* Fixed-width split layouts (sidebar + detail panels inside pages): stack on mobile */
+@media (max-width: 768px) {
+  .wm-split-320, .wm-split-200 {
+    grid-template-columns: 1fr !important;
+  }
+}
