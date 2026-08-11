@@ -14,9 +14,9 @@ const META_APP_ID = "1581681173564903";
 const META_REDIRECT_URI = "https://wameed-system.vercel.app/api/auth/callback/facebook";
 // Base URL of the Supabase Edge Function that finishes the exchange server-side.
 // Format: https://<project-ref>.functions.supabase.co/meta-oauth-exchange
-const META_OAUTH_FUNCTION_URL = "PASTE_YOUR_SUPABASE_FUNCTION_URL_HERE";
+const META_OAUTH_FUNCTION_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/meta-oauth-exchange";
 // Must match the META_OAUTH_SECRET you set as a Supabase secret for that function.
-const META_OAUTH_CALL_SECRET = "PASTE_THE_SAME_RANDOM_SECRET_YOU_SET_IN_SUPABASE";
+const META_OAUTH_CALL_SECRET = "wm2026SecretKey!9x";
 const PC={Meta:"#1877F2",TikTok:"#EE1D52",Snapchat:"#B8A000",Google:"#4285F4",YouTube:"#FF0000",X:"#1DA1F2"};
 
 const IU=[
