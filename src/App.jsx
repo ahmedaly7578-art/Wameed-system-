@@ -6,6 +6,17 @@ const RL={admin:"مدير النظام",media_buyer:"Media Buyer",social_media:"
 const SL={active:"نشط",hold:"موقوف",cancelled:"ملغي"};
 const SC={active:C.green,hold:C.orange,cancelled:C.red};
 const PLATS=["Meta","Snapchat","TikTok","Google","YouTube","X"];
+
+// ─── Meta (Facebook) OAuth — public values only, never put the App Secret here ──
+// App ID isn't sensitive (it's visible in the OAuth URL anyway), but you still
+// need to fill it in with your app's real ID once you have it.
+const META_APP_ID = "PASTE_YOUR_APP_ID_HERE";
+const META_REDIRECT_URI = "https://wameed-system.vercel.app/api/auth/callback/facebook";
+// Base URL of the Supabase Edge Function that finishes the exchange server-side.
+// Format: https://<project-ref>.functions.supabase.co/meta-oauth-exchange
+const META_OAUTH_FUNCTION_URL = "PASTE_YOUR_SUPABASE_FUNCTION_URL_HERE";
+// Must match the META_OAUTH_SECRET you set as a Supabase secret for that function.
+const META_OAUTH_CALL_SECRET = "PASTE_THE_SAME_RANDOM_SECRET_YOU_SET_IN_SUPABASE";
 const PC={Meta:"#1877F2",TikTok:"#EE1D52",Snapchat:"#B8A000",Google:"#4285F4",YouTube:"#FF0000",X:"#1DA1F2"};
 
 const IU=[
@@ -133,8 +144,8 @@ const Mdl=({open,onClose,title,children,width=520})=>{
     </div>
   );
 };
-const Btn=({children,onClick,color,style:st={}})=>(
-  <button onClick={onClick} style={{padding:"10px 18px",background:color||C.grad,border:"none",borderRadius:12,color:"white",fontSize:13,fontWeight:700,fontFamily:"Cairo",cursor:"pointer",...st}}>{children}</button>
+const Btn=({children,onClick,color,style:st={},disabled})=>(
+  <button onClick={onClick} disabled={disabled} style={{padding:"10px 18px",background:color||C.grad,border:"none",borderRadius:12,color:"white",fontSize:13,fontWeight:700,fontFamily:"Cairo",cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.6:1,...st}}>{children}</button>
 );
 const TB=({title,sub,children})=>(
   <div style={{padding:"24px 32px 0",display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:26}}>
@@ -1965,8 +1976,66 @@ function AddCampaignModal({open,onClose,onAdd,clients,currentUser}){
   );
 }
 
-function Campaigns({campaigns,setCampaigns,clients,users,currentUser}){
+function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,metaSyncing}){
+  const linked=adAccounts.filter(a=>a.client_id);
+  const unlinked=adAccounts.filter(a=>!a.client_id);
+  const linkedClientIds=new Set(linked.map(a=>a.client_id));
+  const AccRow=({a})=>{
+    const client=clients.find(c=>c.id===a.client_id);
+    const statusColor=a.status==="connected"?C.green:a.status==="error"?C.red:a.status==="paused"?C.orange:C.textM;
+    const statusLabel=a.status==="connected"?"متصل":a.status==="error"?"فيه مشكلة":a.status==="paused"?"موقوف":"غير مربوط";
+    return(
+      <Card key={a.id} s={{marginBottom:10}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:180}}>
+            <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:3}}>{a.account_name||a.account_id}</div>
+            <div style={{color:C.textM,fontSize:11}}>{a.business_name||"—"} · {a.account_id}</div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:6,color:statusColor,fontSize:11,fontWeight:600}}>
+            <span style={{width:7,height:7,borderRadius:"50%",background:statusColor,display:"inline-block"}}/>
+            {statusLabel}
+          </div>
+          <select value={a.client_id||""} onChange={e=>onLinkAccount(a.id, e.target.value?+e.target.value:null)}
+            style={{padding:"8px 12px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none",minWidth:160}}>
+            <option value="">— اختر العميل —</option>
+            {clients.filter(c=>c.id===a.client_id||!linkedClientIds.has(c.id)).map(c=>
+              <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        {a.last_synced_at && <div style={{color:C.textM,fontSize:10,marginTop:8}}>آخر مزامنة: {fmtDate(a.last_synced_at)}</div>}
+      </Card>
+    );
+  };
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
+        <div style={{color:C.textS,fontSize:12}}>
+          {adAccounts.length===0 ? "مفيش حسابات إعلانية متصلة لسه." : `${linked.length} مربوط · ${unlinked.length} من غير عميل`}
+        </div>
+        <Btn onClick={onConnectMeta} disabled={metaSyncing}>{metaSyncing?"⏳ جاري الاتصال...":"🔗 ربط حساب ميتا"}</Btn>
+      </div>
+      {adAccounts.length===0 && (
+        <Card s={{textAlign:"center",padding:"60px"}}>
+          <div style={{fontSize:40,marginBottom:12}}>🔗</div>
+          <div style={{color:C.textS,fontSize:14,marginBottom:16}}>اربط حساب ميتا بتاعك عشان تجيب كل البيزنسات أوتوماتيك</div>
+          <Btn onClick={onConnectMeta} disabled={metaSyncing}>{metaSyncing?"⏳ جاري الاتصال...":"🔗 ربط حساب ميتا"}</Btn>
+        </Card>
+      )}
+      {unlinked.length>0 && <>
+        <div style={{color:C.text,fontSize:13,fontWeight:700,marginBottom:10}}>محتاجة ربط بعميل ({unlinked.length})</div>
+        {unlinked.map(a=><AccRow key={a.id} a={a}/>)}
+      </>}
+      {linked.length>0 && <>
+        <div style={{color:C.text,fontSize:13,fontWeight:700,margin:"18px 0 10px"}}>مربوطة بعملاء ({linked.length})</div>
+        {linked.map(a=><AccRow key={a.id} a={a}/>)}
+      </>}
+    </div>
+  );
+}
+
+function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=[],onLinkAccount,onConnectMeta,metaSyncing}){
   const [addOpen,setAddOpen]=useState(false);
+  const [tab,setTab]=useState("data");
   const [sc,setSc]=useState("all");const [sp,setSp]=useState("all");
   const myClients=currentUser?.role==="media_buyer"?clients.filter(c=>c.mb===currentUser.id):clients;
   const filtered=campaigns.filter(c=>{
@@ -1979,9 +2048,16 @@ function Campaigns({campaigns,setCampaigns,clients,users,currentUser}){
     <div>
       <AddCampaignModal open={addOpen} onClose={()=>setAddOpen(false)} onAdd={c=>setCampaigns(p=>[...p,c])} clients={clients} currentUser={currentUser}/>
       <TB title="الحملات والأداء 📊" sub="أرقام الحملات عبر كل المنصات">
-        <Btn onClick={()=>setAddOpen(true)}>+ إضافة بيانات حملة</Btn>
+        {tab==="data" && <Btn onClick={()=>setAddOpen(true)}>+ إضافة بيانات حملة</Btn>}
       </TB>
       <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"flex",gap:8,marginBottom:20}}>
+          {[["data","📊 الحملات"],["businesses","🔗 البيزنسات"]].map(([id,label])=>(
+            <button key={id} onClick={()=>setTab(id)} style={{padding:"9px 18px",borderRadius:10,background:tab===id?`${C.pink}18`:"transparent",border:tab===id?`1px solid ${C.pink}33`:`1px solid ${C.border}`,color:tab===id?C.pink:C.textS,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{label}</button>
+          ))}
+        </div>
+        {tab==="businesses" && <BusinessesTab adAccounts={adAccounts} clients={clients} onLinkAccount={onLinkAccount} onConnectMeta={onConnectMeta} metaSyncing={metaSyncing}/>}
+        {tab==="data" && <>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
           <StC label="الإنفاق الكلي" value={`${(filtered.reduce((s,c)=>s+c.spend,0)/1000).toFixed(0)}k SAR`} icon="💸" color={C.orange}/>
           <StC label="متوسط ROAS" value={(filtered.length?filtered.reduce((s,c)=>s+c.roas,0)/filtered.length:0).toFixed(1)} icon="📈" color={C.green}/>
@@ -2025,6 +2101,7 @@ function Campaigns({campaigns,setCampaigns,clients,users,currentUser}){
             </Card>);
           })
         }
+        </>}
       </div>
     </div>
   );
@@ -2937,12 +3014,14 @@ export default function App(){
   const [page, setPage] = useState("dashboard");
   const [dbReady, setDbReady] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [metaSyncing, setMetaSyncing] = useState(false);
 
   // ─── STATE (localStorage as persistence) ──────────────────────────────────
   const [users, setUsersRaw] = useState(() => ls.get("w_users", IU));
   const [clients, setClientsRaw] = useState(() => ls.get("w_clients", IC));
   const [followups, setFollowupsRaw] = useState(() => ls.get("w_followups", IFU));
   const [campaigns, setCampaignsRaw] = useState(() => ls.get("w_campaigns", ICAM));
+  const [adAccounts, setAdAccountsRaw] = useState(() => ls.get("w_adAccounts", []));
   const [tasks, setTasksRaw] = useState(() => ls.get("w_tasks", ITasks));
   const [payroll, setPayrollRaw] = useState(() => ls.get("w_payroll", []));
   const [satisfaction, setSatisfactionRaw] = useState(() => ls.get("w_satisfaction", ISAT));
@@ -2965,6 +3044,7 @@ export default function App(){
   const setClients = mk("w_clients", setClientsRaw);
   const setFollowups = mk("w_followups", setFollowupsRaw);
   const setCampaigns = mk("w_campaigns", setCampaignsRaw);
+  const setAdAccounts = mk("w_adAccounts", setAdAccountsRaw);
   const setTasks = mk("w_tasks", setTasksRaw);
   const setPayroll = mk("w_payroll", setPayrollRaw);
   const setSatisfaction = mk("w_satisfaction", setSatisfactionRaw);
@@ -3041,7 +3121,7 @@ export default function App(){
     try {
       const [
         {data:dU}, {data:dC}, {data:dF}, {data:dCa},
-        {data:dT}, {data:dS}, {data:dP}
+        {data:dT}, {data:dS}, {data:dP}, {data:dAA}
       ] = await Promise.all([
         window.__SB.from("users").select("*"),
         window.__SB.from("clients").select("*"),
@@ -3050,6 +3130,7 @@ export default function App(){
         window.__SB.from("tasks").select("*"),
         window.__SB.from("satisfaction").select("*"),
         window.__SB.from("payroll").select("*"),
+        window.__SB.from("ad_accounts").select("id,account_id,account_name,business_name,platform,client_id,status,is_active,last_synced_at").eq("platform","Meta").order("account_name"),
       ]);
       if(dU?.length) {
         const v=dU.map(u=>({...u,avatar:u.avatar||ini(u.name),avatarUrl:u.avatar_url,isHeadOf:u.is_head_of}));
@@ -3065,10 +3146,42 @@ export default function App(){
       if(dT?.length) { const v=dT.map(t=>({...t,assignedTo:t.assigned_to,clientId:t.client_id,due:t.due_date})); setTasksRaw(v); ls.set("w_tasks",v); }
       if(dS?.length) { const v=dS.map(s=>({...s,clientId:s.client_id,score:s.score_overall,roas:s.score_roas,speed:s.score_speed,reports:s.score_reports})); setSatisfactionRaw(v); ls.set("w_satisfaction",v); }
       if(dP?.length) { const v=dP.map(p=>({...p,userId:p.user_id,base:p.base_salary})); setPayrollRaw(v); ls.set("w_payroll",v); }
+      setAdAccountsRaw(dAA||[]); ls.set("w_adAccounts", dAA||[]);
       // creative_tasks بقى بيتقرا من الجوجل شيت مباشرة (loadCreativeFromSheet)، مش من هنا.
       setDbReady(true);
     } catch(e) { console.log("DB error:", e); }
   };
+
+  // ─── Meta OAuth callback ────────────────────────────────────────────────
+  // Facebook redirects the browser back to META_REDIRECT_URI with ?code=...
+  // This app is a single-page app (no server routes), so the SPA just loads
+  // normally at that path — we read the code from the URL on mount, hand it
+  // to the Edge Function to do the actual (secret-holding) exchange, then
+  // clean the URL and refresh the linked-accounts list.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const state = params.get("state");
+    if (!code) return;
+    const expectedState = ls.get("w_metaOauthState", null);
+    window.history.replaceState({}, "", window.location.pathname.split("?")[0] === "/api/auth/callback/facebook" ? "/" : window.location.pathname);
+    if (expectedState && state !== expectedState) { alert("فشل التحقق من الاتصال بميتا، حاول تاني."); return; }
+    setMetaSyncing(true);
+    setPage("campaigns");
+    const url = new URL(META_OAUTH_FUNCTION_URL);
+    url.searchParams.set("code", code);
+    url.searchParams.set("secret", META_OAUTH_CALL_SECRET);
+    if (user?.id) url.searchParams.set("userId", user.id);
+    fetch(url.toString())
+      .then(r => r.json())
+      .then(res => {
+        if (res.error) { alert("حصل خطأ في الربط: " + res.error); return; }
+        setAdAccountsRaw(res.accounts || []);
+        ls.set("w_adAccounts", res.accounts || []);
+      })
+      .catch(() => alert("حصل خطأ في الاتصال بميتا."))
+      .finally(() => setMetaSyncing(false));
+  }, []);
 
   // expose clients for client login
   useEffect(() => { window.__wameedClients = clients; }, [clients]);
@@ -3277,6 +3390,22 @@ export default function App(){
         setCampaigns(next);
       }}
       clients={clients} users={users} currentUser={user}
+      adAccounts={adAccounts}
+      onLinkAccount={async(accountRowId, clientId)=>{
+        await update("ad_accounts", {client_id: clientId, status: clientId ? "connected" : "unlinked"}, {id: accountRowId});
+        setAdAccounts(p=>p.map(a=>a.id===accountRowId?{...a, client_id:clientId, status: clientId?"connected":"unlinked"}:a));
+      }}
+      onConnectMeta={()=>{
+        const state = crypto.randomUUID();
+        ls.set("w_metaOauthState", state);
+        const authUrl = new URL("https://www.facebook.com/v19.0/dialog/oauth");
+        authUrl.searchParams.set("client_id", META_APP_ID);
+        authUrl.searchParams.set("redirect_uri", META_REDIRECT_URI);
+        authUrl.searchParams.set("state", state);
+        authUrl.searchParams.set("scope", "ads_read");
+        window.location.href = authUrl.toString();
+      }}
+      metaSyncing={metaSyncing}
     />,
     ai: <AIAnalysis clients={clients} campaigns={campaigns} users={users}/>,
     tasks: <Tasks
