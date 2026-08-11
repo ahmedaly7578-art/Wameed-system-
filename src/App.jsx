@@ -10,7 +10,7 @@ const PLATS=["Meta","Snapchat","TikTok","Google","YouTube","X"];
 // ─── Meta (Facebook) OAuth — public values only, never put the App Secret here ──
 // App ID isn't sensitive (it's visible in the OAuth URL anyway), but you still
 // need to fill it in with your app's real ID once you have it.
-const META_APP_ID = "PASTE_YOUR_APP_ID_HERE";
+const META_APP_ID = "1581681173564903";
 const META_REDIRECT_URI = "https://wameed-system.vercel.app/api/auth/callback/facebook";
 // Base URL of the Supabase Edge Function that finishes the exchange server-side.
 // Format: https://<project-ref>.functions.supabase.co/meta-oauth-exchange
