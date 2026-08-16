@@ -23,6 +23,10 @@ const SNAP_CLIENT_ID = "145b2dbd-ed2a-49bc-bb11-e370d4522eb9";
 const SNAP_REDIRECT_URI = "https://wameed-system.vercel.app/api/auth/callback/snapchat";
 const SNAP_OAUTH_FUNCTION_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/snap-oauth-exchange";
 const SNAP_OAUTH_CALL_SECRET = "wm2026SnapKey!7q";
+
+// ─── Campaigns sync (pulls real numbers from Meta + Snapchat into `campaigns`) ──
+const CAMPAIGNS_SYNC_FUNCTION_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/campaigns-sync";
+const CAMPAIGNS_SYNC_CALL_SECRET = "wm2026SyncKey!3z";
 const PC={Meta:"#1877F2",TikTok:"#EE1D52",Snapchat:"#B8A000",Google:"#4285F4",YouTube:"#FF0000",X:"#1DA1F2"};
 
 const IU=[
@@ -1982,7 +1986,7 @@ function AddCampaignModal({open,onClose,onAdd,clients,currentUser}){
   );
 }
 
-function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnectSnap,metaSyncing}){
+function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnectSnap,onSyncNow,metaSyncing,isAdmin}){
   const linked=adAccounts.filter(a=>a.client_id);
   const unlinked=adAccounts.filter(a=>!a.client_id);
   const linkedClientIds=new Set(linked.map(a=>a.client_id));
@@ -2008,6 +2012,10 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
             {clients.filter(c=>c.id===a.client_id||!linkedClientIds.has(c.id)).map(c=>
               <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          {isAdmin && a.client_id && (
+            <button onClick={()=>onSyncNow(a.id)} disabled={metaSyncing} title="مزامنة الأرقام دلوقتي"
+              style={{padding:"7px 12px",borderRadius:9,background:`${C.blue}15`,border:`1px solid ${C.blue}35`,color:C.blue,fontSize:11,fontWeight:600,cursor:metaSyncing?"not-allowed":"pointer",opacity:metaSyncing?0.6:1,fontFamily:"Cairo"}}>🔄 مزامنة</button>
+          )}
         </div>
         {a.last_synced_at && <div style={{color:C.textM,fontSize:10,marginTop:8}}>آخر مزامنة: {fmtDate(a.last_synced_at)}</div>}
       </Card>
@@ -2019,9 +2027,12 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
         <div style={{color:C.textS,fontSize:12}}>
           {adAccounts.length===0 ? "مفيش حسابات إعلانية متصلة لسه." : `${linked.length} مربوط · ${unlinked.length} من غير عميل`}
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <Btn onClick={onConnectMeta} disabled={metaSyncing}>{metaSyncing?"⏳ جاري الاتصال...":"📘 ربط حساب ميتا"}</Btn>
-          <Btn onClick={onConnectSnap} disabled={metaSyncing} color="linear-gradient(135deg,#FFFC00,#FFE600)" style={{color:"#111"}}>{metaSyncing?"⏳ جاري الاتصال...":"👻 ربط حساب سناب شات"}</Btn>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <Btn onClick={onConnectMeta} disabled={metaSyncing}>{metaSyncing?"⏳ جاري...":"📘 ربط حساب ميتا"}</Btn>
+          <Btn onClick={onConnectSnap} disabled={metaSyncing} color="linear-gradient(135deg,#FFFC00,#FFE600)" style={{color:"#111"}}>{metaSyncing?"⏳ جاري...":"👻 ربط حساب سناب شات"}</Btn>
+          {isAdmin && linked.length>0 && (
+            <Btn onClick={()=>onSyncNow()} disabled={metaSyncing} color={`linear-gradient(135deg, ${C.blue}, #6366F1)`}>{metaSyncing?"⏳ جاري المزامنة...":"🔄 مزامنة الكل دلوقتي"}</Btn>
+          )}
         </div>
       </div>
       {adAccounts.length===0 && (
@@ -2042,7 +2053,7 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
   );
 }
 
-function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=[],onLinkAccount,onConnectMeta,onConnectSnap,metaSyncing,tab,setTab}){
+function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=[],onLinkAccount,onConnectMeta,onConnectSnap,onSyncNow,metaSyncing,tab,setTab}){
   const [addOpen,setAddOpen]=useState(false);
   const [sc,setSc]=useState("all");const [sp,setSp]=useState("all");
   const myClients=currentUser?.role==="media_buyer"?clients.filter(c=>c.mb===currentUser.id):clients;
@@ -2064,7 +2075,7 @@ function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=
             <button key={id} onClick={()=>setTab(id)} style={{padding:"9px 18px",borderRadius:10,background:tab===id?`${C.pink}18`:"transparent",border:tab===id?`1px solid ${C.pink}33`:`1px solid ${C.border}`,color:tab===id?C.pink:C.textS,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{label}</button>
           ))}
         </div>
-        {tab==="businesses" && <BusinessesTab adAccounts={adAccounts} clients={clients} onLinkAccount={onLinkAccount} onConnectMeta={onConnectMeta} onConnectSnap={onConnectSnap} metaSyncing={metaSyncing}/>}
+        {tab==="businesses" && <BusinessesTab adAccounts={adAccounts} clients={clients} onLinkAccount={onLinkAccount} onConnectMeta={onConnectMeta} onConnectSnap={onConnectSnap} onSyncNow={onSyncNow} metaSyncing={metaSyncing} isAdmin={currentUser?.role==="admin"}/>}
         {tab==="data" && <>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
           <StC label="الإنفاق الكلي" value={`${(filtered.reduce((s,c)=>s+c.spend,0)/1000).toFixed(0)}k SAR`} icon="💸" color={C.orange}/>
@@ -3411,6 +3422,24 @@ export default function App(){
       onLinkAccount={async(accountRowId, clientId)=>{
         await update("ad_accounts", {client_id: clientId, status: clientId ? "connected" : "unlinked"}, {id: accountRowId});
         setAdAccounts(p=>p.map(a=>a.id===accountRowId?{...a, client_id:clientId, status: clientId?"connected":"unlinked"}:a));
+      }}
+      onSyncNow={async(accountId)=>{
+        setMetaSyncing(true);
+        try{
+          const url = new URL(CAMPAIGNS_SYNC_FUNCTION_URL);
+          url.searchParams.set("secret", CAMPAIGNS_SYNC_CALL_SECRET);
+          if(accountId) url.searchParams.set("accountId", accountId);
+          const res = await fetch(url.toString()).then(r=>r.json());
+          if(res.error){ alert("حصل خطأ في المزامنة: "+res.error); return; }
+          const [{data:dCa},{data:dAA}] = await Promise.all([
+            window.__SB.from("campaigns").select("*").order("week_start",{ascending:false}),
+            window.__SB.from("ad_accounts").select("id,account_id,account_name,business_name,platform,client_id,status,is_active,last_synced_at").in("platform",["Meta","Snapchat"]).order("account_name"),
+          ]);
+          if(dCa){ const v=dCa.map(c=>({...c,clientId:c.client_id,week:c.week_start,purchaseValue:c.purchase_value})); setCampaignsRaw(v); ls.set("w_campaigns",v); }
+          setAdAccountsRaw(dAA||[]); ls.set("w_adAccounts", dAA||[]);
+          alert(`تمت المزامنة: ${res.synced} حساب${res.failed?` (${res.failed} فشل)`:""}`);
+        } catch(e){ alert("حصل خطأ في المزامنة."); }
+        finally{ setMetaSyncing(false); }
       }}
       onConnectMeta={()=>{
         const state = crypto.randomUUID();
