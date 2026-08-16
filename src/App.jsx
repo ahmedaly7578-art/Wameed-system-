@@ -2002,7 +2002,7 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
             <span style={{width:7,height:7,borderRadius:"50%",background:statusColor,display:"inline-block"}}/>
             {statusLabel}
           </div>
-          <select value={a.client_id||""} onChange={e=>onLinkAccount(a.id, e.target.value?+e.target.value:null)}
+          <select value={a.client_id||""} onChange={e=>onLinkAccount(a.id, e.target.value||null)}
             style={{padding:"8px 12px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none",minWidth:160}}>
             <option value="">— اختر العميل —</option>
             {clients.filter(c=>c.id===a.client_id||!linkedClientIds.has(c.id)).map(c=>
