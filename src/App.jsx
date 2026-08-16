@@ -2042,9 +2042,8 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
   );
 }
 
-function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=[],onLinkAccount,onConnectMeta,onConnectSnap,metaSyncing}){
+function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=[],onLinkAccount,onConnectMeta,onConnectSnap,metaSyncing,tab,setTab}){
   const [addOpen,setAddOpen]=useState(false);
-  const [tab,setTab]=useState("data");
   const [sc,setSc]=useState("all");const [sp,setSp]=useState("all");
   const myClients=currentUser?.role==="media_buyer"?clients.filter(c=>c.mb===currentUser.id):clients;
   const filtered=campaigns.filter(c=>{
@@ -3024,6 +3023,7 @@ export default function App(){
   const [dbReady, setDbReady] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [metaSyncing, setMetaSyncing] = useState(false);
+  const [campaignsTab, setCampaignsTab] = useState("data");
 
   // ─── STATE (localStorage as persistence) ──────────────────────────────────
   const [users, setUsersRaw] = useState(() => ls.get("w_users", IU));
@@ -3178,6 +3178,7 @@ export default function App(){
     if (expectedState && state !== expectedState) { alert("فشل التحقق من الاتصال، حاول تاني."); return; }
     setMetaSyncing(true);
     setPage("campaigns");
+    setCampaignsTab("businesses");
     const fnUrl = isSnap ? SNAP_OAUTH_FUNCTION_URL : META_OAUTH_FUNCTION_URL;
     const callSecret = isSnap ? SNAP_OAUTH_CALL_SECRET : META_OAUTH_CALL_SECRET;
     const url = new URL(fnUrl);
@@ -3433,6 +3434,7 @@ export default function App(){
         window.location.href = authUrl.toString();
       }}
       metaSyncing={metaSyncing}
+      tab={campaignsTab} setTab={setCampaignsTab}
     />,
     ai: <AIAnalysis clients={clients} campaigns={campaigns} users={users}/>,
     tasks: <Tasks
