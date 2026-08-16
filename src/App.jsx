@@ -17,6 +17,12 @@ const META_REDIRECT_URI = "https://wameed-system.vercel.app/api/auth/callback/fa
 const META_OAUTH_FUNCTION_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/meta-oauth-exchange";
 // Must match the META_OAUTH_SECRET you set as a Supabase secret for that function.
 const META_OAUTH_CALL_SECRET = "wm2026SecretKey!9x";
+
+// ─── Snapchat OAuth — same idea, different platform ──────────────────────────
+const SNAP_CLIENT_ID = "145b2dbd-ed2a-49bc-bb11-e370d4522eb9";
+const SNAP_REDIRECT_URI = "https://wameed-system.vercel.app/api/auth/callback/snapchat";
+const SNAP_OAUTH_FUNCTION_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/snap-oauth-exchange";
+const SNAP_OAUTH_CALL_SECRET = "wm2026SnapKey!7q";
 const PC={Meta:"#1877F2",TikTok:"#EE1D52",Snapchat:"#B8A000",Google:"#4285F4",YouTube:"#FF0000",X:"#1DA1F2"};
 
 const IU=[
@@ -1976,10 +1982,11 @@ function AddCampaignModal({open,onClose,onAdd,clients,currentUser}){
   );
 }
 
-function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,metaSyncing}){
+function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnectSnap,metaSyncing}){
   const linked=adAccounts.filter(a=>a.client_id);
   const unlinked=adAccounts.filter(a=>!a.client_id);
   const linkedClientIds=new Set(linked.map(a=>a.client_id));
+  const platIcon=(p)=>p==="Meta"?"📘":p==="Snapchat"?"👻":"📊";
   const AccRow=({a})=>{
     const client=clients.find(c=>c.id===a.client_id);
     const statusColor=a.status==="connected"?C.green:a.status==="error"?C.red:a.status==="paused"?C.orange:C.textM;
@@ -1988,8 +1995,8 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,metaSynci
       <Card key={a.id} s={{marginBottom:10}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
           <div style={{flex:1,minWidth:180}}>
-            <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:3}}>{a.account_name||a.account_id}</div>
-            <div style={{color:C.textM,fontSize:11}}>{a.business_name||"—"} · {a.account_id}</div>
+            <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:3}}>{platIcon(a.platform)} {a.account_name||a.account_id}</div>
+            <div style={{color:C.textM,fontSize:11}}>{a.platform} · {a.account_id}</div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,color:statusColor,fontSize:11,fontWeight:600}}>
             <span style={{width:7,height:7,borderRadius:"50%",background:statusColor,display:"inline-block"}}/>
@@ -2012,13 +2019,15 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,metaSynci
         <div style={{color:C.textS,fontSize:12}}>
           {adAccounts.length===0 ? "مفيش حسابات إعلانية متصلة لسه." : `${linked.length} مربوط · ${unlinked.length} من غير عميل`}
         </div>
-        <Btn onClick={onConnectMeta} disabled={metaSyncing}>{metaSyncing?"⏳ جاري الاتصال...":"🔗 ربط حساب ميتا"}</Btn>
+        <div style={{display:"flex",gap:8}}>
+          <Btn onClick={onConnectMeta} disabled={metaSyncing}>{metaSyncing?"⏳ جاري الاتصال...":"📘 ربط حساب ميتا"}</Btn>
+          <Btn onClick={onConnectSnap} disabled={metaSyncing} color="linear-gradient(135deg,#FFFC00,#FFE600)" style={{color:"#111"}}>{metaSyncing?"⏳ جاري الاتصال...":"👻 ربط حساب سناب شات"}</Btn>
+        </div>
       </div>
       {adAccounts.length===0 && (
         <Card s={{textAlign:"center",padding:"60px"}}>
           <div style={{fontSize:40,marginBottom:12}}>🔗</div>
-          <div style={{color:C.textS,fontSize:14,marginBottom:16}}>اربط حساب ميتا بتاعك عشان تجيب كل البيزنسات أوتوماتيك</div>
-          <Btn onClick={onConnectMeta} disabled={metaSyncing}>{metaSyncing?"⏳ جاري الاتصال...":"🔗 ربط حساب ميتا"}</Btn>
+          <div style={{color:C.textS,fontSize:14,marginBottom:16}}>اربطي حساب ميتا أو سناب شات عشان تجيب كل البيزنسات أوتوماتيك</div>
         </Card>
       )}
       {unlinked.length>0 && <>
@@ -2033,7 +2042,7 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,metaSynci
   );
 }
 
-function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=[],onLinkAccount,onConnectMeta,metaSyncing}){
+function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=[],onLinkAccount,onConnectMeta,onConnectSnap,metaSyncing}){
   const [addOpen,setAddOpen]=useState(false);
   const [tab,setTab]=useState("data");
   const [sc,setSc]=useState("all");const [sp,setSp]=useState("all");
@@ -2056,7 +2065,7 @@ function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=
             <button key={id} onClick={()=>setTab(id)} style={{padding:"9px 18px",borderRadius:10,background:tab===id?`${C.pink}18`:"transparent",border:tab===id?`1px solid ${C.pink}33`:`1px solid ${C.border}`,color:tab===id?C.pink:C.textS,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{label}</button>
           ))}
         </div>
-        {tab==="businesses" && <BusinessesTab adAccounts={adAccounts} clients={clients} onLinkAccount={onLinkAccount} onConnectMeta={onConnectMeta} metaSyncing={metaSyncing}/>}
+        {tab==="businesses" && <BusinessesTab adAccounts={adAccounts} clients={clients} onLinkAccount={onLinkAccount} onConnectMeta={onConnectMeta} onConnectSnap={onConnectSnap} metaSyncing={metaSyncing}/>}
         {tab==="data" && <>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
           <StC label="الإنفاق الكلي" value={`${(filtered.reduce((s,c)=>s+c.spend,0)/1000).toFixed(0)}k SAR`} icon="💸" color={C.orange}/>
@@ -3130,7 +3139,7 @@ export default function App(){
         window.__SB.from("tasks").select("*"),
         window.__SB.from("satisfaction").select("*"),
         window.__SB.from("payroll").select("*"),
-        window.__SB.from("ad_accounts").select("id,account_id,account_name,business_name,platform,client_id,status,is_active,last_synced_at").eq("platform","Meta").order("account_name"),
+        window.__SB.from("ad_accounts").select("id,account_id,account_name,business_name,platform,client_id,status,is_active,last_synced_at").in("platform",["Meta","Snapchat"]).order("account_name"),
       ]);
       if(dU?.length) {
         const v=dU.map(u=>({...u,avatar:u.avatar||ini(u.name),avatarUrl:u.avatar_url,isHeadOf:u.is_head_of}));
@@ -3163,23 +3172,30 @@ export default function App(){
     const code = params.get("code");
     const state = params.get("state");
     if (!code) return;
+    const isSnap = window.location.pathname === "/api/auth/callback/snapchat";
     const expectedState = ls.get("w_metaOauthState", null);
-    window.history.replaceState({}, "", window.location.pathname.split("?")[0] === "/api/auth/callback/facebook" ? "/" : window.location.pathname);
-    if (expectedState && state !== expectedState) { alert("فشل التحقق من الاتصال بميتا، حاول تاني."); return; }
+    window.history.replaceState({}, "", "/");
+    if (expectedState && state !== expectedState) { alert("فشل التحقق من الاتصال، حاول تاني."); return; }
     setMetaSyncing(true);
     setPage("campaigns");
-    const url = new URL(META_OAUTH_FUNCTION_URL);
+    const fnUrl = isSnap ? SNAP_OAUTH_FUNCTION_URL : META_OAUTH_FUNCTION_URL;
+    const callSecret = isSnap ? SNAP_OAUTH_CALL_SECRET : META_OAUTH_CALL_SECRET;
+    const url = new URL(fnUrl);
     url.searchParams.set("code", code);
-    url.searchParams.set("secret", META_OAUTH_CALL_SECRET);
+    url.searchParams.set("secret", callSecret);
     if (user?.id) url.searchParams.set("userId", user.id);
     fetch(url.toString())
       .then(r => r.json())
       .then(res => {
         if (res.error) { alert("حصل خطأ في الربط: " + res.error); return; }
-        setAdAccountsRaw(res.accounts || []);
-        ls.set("w_adAccounts", res.accounts || []);
+        setAdAccountsRaw(prev => {
+          const otherPlatform = prev.filter(a => a.platform !== (isSnap ? "Snapchat" : "Meta"));
+          const merged = [...otherPlatform, ...(res.accounts || [])];
+          ls.set("w_adAccounts", merged);
+          return merged;
+        });
       })
-      .catch(() => alert("حصل خطأ في الاتصال بميتا."))
+      .catch(() => alert("حصل خطأ في الاتصال."))
       .finally(() => setMetaSyncing(false));
   }, []);
 
@@ -3403,6 +3419,17 @@ export default function App(){
         authUrl.searchParams.set("redirect_uri", META_REDIRECT_URI);
         authUrl.searchParams.set("state", state);
         authUrl.searchParams.set("scope", "ads_read");
+        window.location.href = authUrl.toString();
+      }}
+      onConnectSnap={()=>{
+        const state = crypto.randomUUID();
+        ls.set("w_metaOauthState", state);
+        const authUrl = new URL("https://accounts.snapchat.com/login/oauth2/authorize");
+        authUrl.searchParams.set("client_id", SNAP_CLIENT_ID);
+        authUrl.searchParams.set("redirect_uri", SNAP_REDIRECT_URI);
+        authUrl.searchParams.set("response_type", "code");
+        authUrl.searchParams.set("scope", "snapchat-marketing-api");
+        authUrl.searchParams.set("state", state);
         window.location.href = authUrl.toString();
       }}
       metaSyncing={metaSyncing}
