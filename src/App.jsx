@@ -1986,7 +1986,9 @@ function AddCampaignModal({open,onClose,onAdd,clients,currentUser}){
   );
 }
 
-function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnectSnap,onSyncNow,metaSyncing,isAdmin}){
+function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnectSnap,onSyncNow,onSyncRange,metaSyncing,isAdmin}){
+  const [rangeFrom,setRangeFrom]=useState("");
+  const [rangeTo,setRangeTo]=useState("");
   const linked=adAccounts.filter(a=>a.client_id);
   const unlinked=adAccounts.filter(a=>!a.client_id);
   const linkedClientIds=new Set(linked.map(a=>a.client_id));
@@ -2035,6 +2037,24 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
           )}
         </div>
       </div>
+      {isAdmin && linked.length>0 && (
+        <Card s={{marginBottom:20,display:"flex",alignItems:"flex-end",gap:10,flexWrap:"wrap"}}>
+          <div>
+            <div style={{color:C.textS,fontSize:11,marginBottom:5}}>من تاريخ</div>
+            <input type="date" value={rangeFrom} onChange={e=>setRangeFrom(e.target.value)}
+              style={{padding:"8px 10px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:9,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none"}}/>
+          </div>
+          <div>
+            <div style={{color:C.textS,fontSize:11,marginBottom:5}}>لحد تاريخ (اختياري)</div>
+            <input type="date" value={rangeTo} onChange={e=>setRangeTo(e.target.value)}
+              style={{padding:"8px 10px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:9,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none"}}/>
+          </div>
+          <Btn onClick={()=>{ if(!rangeFrom){alert("اختاري تاريخ البداية الأول");return;} onSyncRange(rangeFrom, rangeTo||null); }} disabled={metaSyncing} color={`linear-gradient(135deg, ${C.orange}, #EA580C)`}>
+            {metaSyncing?"⏳ جاري الاستيراد...":"📥 استيراد الفترة دي كلها"}
+          </Btn>
+          <div style={{color:C.textM,fontSize:10,flexBasis:"100%"}}>ده هيسحب كل الأسابيع من التاريخ ده لحد دلوقتي (أو لحد التاريخ التاني لو حطيتيه) — ممكن ياخد وقت أطول شوية</div>
+        </Card>
+      )}
       {adAccounts.length===0 && (
         <Card s={{textAlign:"center",padding:"60px"}}>
           <div style={{fontSize:40,marginBottom:12}}>🔗</div>
@@ -2053,7 +2073,7 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
   );
 }
 
-function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=[],onLinkAccount,onConnectMeta,onConnectSnap,onSyncNow,metaSyncing,tab,setTab}){
+function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=[],onLinkAccount,onConnectMeta,onConnectSnap,onSyncNow,onSyncRange,metaSyncing,tab,setTab}){
   const [addOpen,setAddOpen]=useState(false);
   const [sc,setSc]=useState("all");const [sp,setSp]=useState("all");
   const myClients=currentUser?.role==="media_buyer"?clients.filter(c=>c.mb===currentUser.id):clients;
@@ -2075,7 +2095,7 @@ function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=
             <button key={id} onClick={()=>setTab(id)} style={{padding:"9px 18px",borderRadius:10,background:tab===id?`${C.pink}18`:"transparent",border:tab===id?`1px solid ${C.pink}33`:`1px solid ${C.border}`,color:tab===id?C.pink:C.textS,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{label}</button>
           ))}
         </div>
-        {tab==="businesses" && <BusinessesTab adAccounts={adAccounts} clients={clients} onLinkAccount={onLinkAccount} onConnectMeta={onConnectMeta} onConnectSnap={onConnectSnap} onSyncNow={onSyncNow} metaSyncing={metaSyncing} isAdmin={currentUser?.role==="admin"}/>}
+        {tab==="businesses" && <BusinessesTab adAccounts={adAccounts} clients={clients} onLinkAccount={onLinkAccount} onConnectMeta={onConnectMeta} onConnectSnap={onConnectSnap} onSyncNow={onSyncNow} onSyncRange={onSyncRange} metaSyncing={metaSyncing} isAdmin={currentUser?.role==="admin"}/>}
         {tab==="data" && <>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
           <StC label="الإنفاق الكلي" value={`${(filtered.reduce((s,c)=>s+c.spend,0)/1000).toFixed(0)}k SAR`} icon="💸" color={C.orange}/>
@@ -3439,6 +3459,25 @@ export default function App(){
           setAdAccountsRaw(dAA||[]); ls.set("w_adAccounts", dAA||[]);
           alert(`تمت المزامنة: ${res.synced} حساب${res.failed?` (${res.failed} فشل)`:""}`);
         } catch(e){ alert("حصل خطأ في المزامنة."); }
+        finally{ setMetaSyncing(false); }
+      }}
+      onSyncRange={async(from,to)=>{
+        setMetaSyncing(true);
+        try{
+          const url = new URL(CAMPAIGNS_SYNC_FUNCTION_URL);
+          url.searchParams.set("secret", CAMPAIGNS_SYNC_CALL_SECRET);
+          url.searchParams.set("from", from);
+          if(to) url.searchParams.set("to", to);
+          const res = await fetch(url.toString()).then(r=>r.json());
+          if(res.error){ alert("حصل خطأ في الاستيراد: "+res.error); return; }
+          const [{data:dCa},{data:dAA}] = await Promise.all([
+            window.__SB.from("campaigns").select("*").order("week_start",{ascending:false}),
+            window.__SB.from("ad_accounts").select("id,account_id,account_name,business_name,platform,client_id,status,is_active,last_synced_at").in("platform",["Meta","Snapchat"]).order("account_name"),
+          ]);
+          if(dCa){ const v=dCa.map(c=>({...c,clientId:c.client_id,week:c.week_start,purchaseValue:c.purchase_value})); setCampaignsRaw(v); ls.set("w_campaigns",v); }
+          setAdAccountsRaw(dAA||[]); ls.set("w_adAccounts", dAA||[]);
+          alert(`تم الاستيراد: ${res.weeksSynced} أسبوع × الحسابات — ${res.synced} نجح${res.failed?` / ${res.failed} فشل`:""}`);
+        } catch(e){ alert("حصل خطأ في الاستيراد."); }
         finally{ setMetaSyncing(false); }
       }}
       onConnectMeta={()=>{
