@@ -2456,6 +2456,7 @@ function TeamMgmt({users,setUsers}){
   const [f,setF]=useState({name:"",role:"media_buyer",email:"",password:""});
   const [err,setErr]=useState("");const [saving,setSaving]=useState(false);
   const sf=(k,v)=>setF(p=>({...p,[k]:v}));
+  const [showPw,setShowPw]=useState(false);
 
   const save=async()=>{
     if(!f.name.trim()||!f.email.trim()||!f.password){setErr("أكمل جميع الحقول");return;}
@@ -2485,7 +2486,8 @@ function TeamMgmt({users,setUsers}){
       <Mdl open={open} onClose={()=>setOpen(false)} title={edit?"✏️ تعديل موظف":"➕ إضافة موظف"} width={420}>
         <Inp label="الاسم الكامل" value={f.name} onChange={v=>sf("name",v)} req placeholder="أحمد محمد"/>
         <Inp label="البريد الإلكتروني" value={f.email} onChange={v=>sf("email",v)} type="email" req placeholder="ahmed@wameed.sa"/>
-        <Inp label="كلمة المرور" value={f.password} onChange={v=>sf("password",v)} req placeholder="••••••••"/>
+        <Inp label="كلمة المرور" value={f.password} onChange={v=>sf("password",v)} type={showPw?"text":"password"} req placeholder="••••••••"/>
+        <button type="button" onClick={()=>setShowPw(x=>!x)} style={{background:"none",border:"none",color:C.textM,fontSize:11,cursor:"pointer",fontFamily:"Cairo",marginTop:-8,marginBottom:10}}>{showPw?"إخفاء كلمة المرور":"إظهار كلمة المرور"}</button>
         <Sel label="الدور" value={f.role} onChange={v=>sf("role",v)} opts={[{v:"admin",l:"مدير النظام (صلاحيات كاملة)"},{v:"media_buyer",l:"Media Buyer"},{v:"social_media",l:"Social Media"},{v:"account_manager",l:"Account Manager"},{v:"designer",l:"Designer"}]} req/>
         {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
         <div style={{display:"flex",gap:10}}>
