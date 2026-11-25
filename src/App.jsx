@@ -314,7 +314,7 @@ function Dashboard({clients,users,notifs,followups,tasks}){
   const lateTasks=tasks.filter(t=>new Date(t.due)<new Date()&&t.status!=="done");
   return(
     <div>
-      <TB title="لوحة التحكم" sub="نظرة عامة على الأداء والفريق — مايو 2025">
+      <TB title="لوحة التحكم" sub="نظرة عامة على الأداء والفريق">
         <div style={{display:"flex",alignItems:"center",gap:6,background:`${C.green}18`,border:`1px solid ${C.green}33`,borderRadius:20,padding:"6px 14px"}}>
           <div style={{width:6,height:6,borderRadius:"50%",background:C.green,boxShadow:`0 0 6px ${C.green}`}}/>
           <span style={{color:C.green,fontSize:12,fontWeight:600}}>النظام يعمل</span>
@@ -322,9 +322,9 @@ function Dashboard({clients,users,notifs,followups,tasks}){
       </TB>
       <div className="wm-page" style={{padding:"0 32px"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:20}}>
-          <StC label="العملاء النشطين" value={active.length} icon="👥" color={C.pink} trend={12} sub={`${clients.filter(c=>c.status==="hold").length} موقوف`}/>
-          <StC label="إجمالي الإيرادات" value={`${(rev/1000).toFixed(0)}k SAR`} icon="💰" color={C.green} trend={5}/>
-          <StC label="متوسط ROAS" value={avgR} icon="📈" color={C.purple} trend={8}/>
+          <StC label="العملاء النشطين" value={active.length} icon="👥" color={C.pink} sub={`${clients.filter(c=>c.status==="hold").length} موقوف`}/>
+          <StC label="إجمالي قيمة الباقات (من بيانات العملاء)" value={`${(rev/1000).toFixed(0)}k SAR`} icon="💰" color={C.green}/>
+          <StC label="متوسط ROAS (مُدخل يدوياً في بيانات العميل)" value={avgR} icon="📈" color={C.purple}/>
           <StC label="تجديد خلال 14 يوم" value={renew.length} icon="🔔" color={C.orange}/>
         </div>
         {(late.length>0||lateTasks.length>0)&&(
@@ -2029,7 +2029,7 @@ function AccStats({a}){
           <thead><tr><th style={{textAlign:"right",padding:6}}>الحملة</th>{sel.map(k=><th key={k} style={{textAlign:"right",padding:6}}>{lbl[k]}</th>)}</tr></thead>
           <tbody>{camps.map((c,i)=><tr key={i} style={{borderTop:`1px solid ${C.border}`}}><td style={{padding:6}}>{c.name}{c.status?` · ${c.status}`:""}</td>{sel.map(k=><td key={k} style={{padding:6}}>{(c.m[k]||0).toLocaleString("en-US",{maximumFractionDigits:2})}</td>)}</tr>)}</tbody>
         </table></div>}
-        {data&&<div style={{color:C.textM,fontSize:10,marginTop:6}}>آخر جلب: {new Date(data.fetched_at).toLocaleString("ar-EG")}{data.cached?" (من الكاش — بيتجدد كل 5 دقائق)":""}</div>}
+        {data&&<div style={{color:C.textM,fontSize:10,marginTop:6}}>آخر جلب: {new Date(data.fetched_at).toLocaleString("ar-EG")}{data.cached?" (من الكاش — ممكن يكون متخزن لحد 5 دقائق)":""}</div>}
       </div>}
     </div>
   );
