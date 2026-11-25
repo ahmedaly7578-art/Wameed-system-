@@ -3,8 +3,8 @@ import { useState, useEffect, useRef, useMemo } from "react";
 const C={bg:"#070E1F",bgCard:"#0D1526",bgHover:"#111E35",bgModal:"#0A1220",border:"rgba(255,255,255,0.07)",borderH:"rgba(255,255,255,0.14)",text:"#F1F5FF",textS:"rgba(255,255,255,0.5)",textM:"rgba(255,255,255,0.25)",pink:"#E879A0",purple:"#7B6FE0",green:"#34D399",blue:"#60A5FA",orange:"#F59E0B",red:"#F87171",teal:"#2DD4BF",grad:"linear-gradient(135deg,#E879A0 0%,#7B6FE0 100%)"};
 const RC={admin:C.pink,media_buyer:C.purple,social_media:C.green,account_manager:C.blue,designer:C.teal};
 const RL={admin:"مدير النظام",media_buyer:"Media Buyer",social_media:"Social Media",account_manager:"Account Manager",designer:"Designer"};
-const SL={active:"نشط",hold:"موقوف",cancelled:"ملغي"};
-const SC={active:C.green,hold:C.orange,cancelled:C.red};
+const SL={active:"نشط",hold:"موقوف",cancelled:"ملغي",pending:"قيد التفعيل"};
+const SC={active:C.green,hold:C.orange,cancelled:C.red,pending:C.blue};
 const PLATS=["Meta","Snapchat","TikTok","Google","YouTube","X"];
 
 // ─── Meta (Facebook) OAuth — public values only, never put the App Secret here ──
@@ -563,7 +563,7 @@ function ChurnTracker({clients,users}){
           </Card>
           <Card>
             <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:16}}>نسب الحالات</div>
-            {[["نشط",clients.filter(c=>c.status==="active").length,C.green],["موقوف",clients.filter(c=>c.status==="hold").length,C.orange],["ملغي",cancelled.length,C.red]].map(([l,v,co])=>{
+            {[["نشط",clients.filter(c=>c.status==="active").length,C.green],["موقوف",clients.filter(c=>c.status==="hold").length,C.orange],["قيد التفعيل",clients.filter(c=>c.status==="pending").length,C.blue],["ملغي",cancelled.length,C.red]].map(([l,v,co])=>{
               const p=allTotal?((v/allTotal)*100).toFixed(0):0;
               return(<div key={l} style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
                 <Bdg label={l} color={co}/>
@@ -957,7 +957,7 @@ function AddClientModal({open,onClose,onAdd,users}){
           );})}
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}>
-          <Sel label="الحالة" value={f.status} onChange={v=>s("status",v)} opts={[{v:"active",l:"نشط"},{v:"hold",l:"موقوف"},{v:"cancelled",l:"ملغي"}]} mb={0}/>
+          <Sel label="الحالة" value={f.status} onChange={v=>s("status",v)} opts={[{v:"active",l:"نشط"},{v:"hold",l:"موقوف"},{v:"pending",l:"قيد التفعيل"},{v:"cancelled",l:"ملغي"}]} mb={0}/>
           <Inp label="ROAS الحالي (اختياري)" value={f.roas} onChange={v=>s("roas",v)} type="number" placeholder="3.5" mb={0}/>
         </div>
         <div style={{marginTop:14}}><label style={{display:"block",fontSize:12,fontWeight:600,color:C.textS,marginBottom:6}}>ملاحظات</label><textarea value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="أي ملاحظات عن العميل..." style={{width:"100%",padding:"10px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,outline:"none",fontFamily:"Cairo",boxSizing:"border-box",resize:"vertical",minHeight:60,direction:"rtl"}}/></div>
@@ -1289,7 +1289,7 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ابحث بالاسم أو MB..." style={{width:"100%",padding:"10px 16px 10px 36px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,fontSize:13,fontFamily:"Cairo",outline:"none",boxSizing:"border-box"}}/>
             <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:C.textM}}>🔍</span>
           </div>
-          {["all","active","hold","cancelled"].map(s=>(
+          {["all","active","hold","pending","cancelled"].map(s=>(
             <button key={s} onClick={()=>setFilter(s)} style={{padding:"9px 16px",borderRadius:20,fontFamily:"Cairo",fontSize:12,fontWeight:500,cursor:"pointer",border:"1px solid",background:filter===s?`${C.pink}18`:C.bgCard,color:filter===s?C.pink:C.textS,borderColor:filter===s?`${C.pink}44`:C.border}}>
               {s==="all"?"الكل":SL[s]}
             </button>
@@ -1327,9 +1327,9 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
                           <div style={{display:"flex",gap:6}}>
                             <button onClick={()=>setSel(c)} style={{padding:"5px 12px",borderRadius:8,background:`${C.purple}18`,border:`1px solid ${C.purple}33`,color:C.purple,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>عرض</button>
                             <button onClick={()=>{
-                              const next=["active","hold","cancelled"];
+                              const next=["active","hold","pending","cancelled"];
                               const cur=next.indexOf(c.status);
-                              const newStatus=next[(cur+1)%3];
+                              const newStatus=next[(cur+1)%next.length];
                               setClients(p=>p.map(x=>x.id===c.id?{...x,status:newStatus}:x));
                             }} style={{padding:"5px 10px",borderRadius:8,background:`${C.orange}18`,border:`1px solid ${C.orange}33`,color:C.orange,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}} title="تغيير الحالة">⟳</button>
                             <button onClick={()=>{if(window.confirm(`هل تريد حذف "${c.name}"؟`))setClients(p=>p.filter(x=>x.id!==c.id));}} style={{padding:"5px 10px",borderRadius:8,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>
@@ -2638,7 +2638,7 @@ ${myCams.map(c=>`
 </div>`).join("")}
 
 <div class="renewal">
-  <div><div class="renew-label">حالة الاشتراك</div><div class="renew-val">${client.status==="active"?"نشط ✓":"موقوف"}</div></div>
+  <div><div class="renew-label">حالة الاشتراك</div><div class="renew-val">${client.status==="active"?"نشط ✓":client.status==="pending"?"قيد التفعيل":"موقوف"}</div></div>
   <div style="text-align:left"><div class="renew-label">الباقة</div><div class="renew-val">${client.pkg.toLocaleString()} SAR / شهر</div></div>
   <div style="text-align:left"><div class="renew-label">تنتهي في</div><div class="renew-val">${new Date(client.end)>new Date()?`${Math.ceil((new Date(client.end)-new Date())/86400000)} يوم`:"انتهت"}</div></div>
 </div>
@@ -2703,7 +2703,7 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
           <div style={{background:`${C.purple}15`,border:`1px solid ${C.purple}33`,borderRadius:10,padding:"10px 12px"}}>
             <div style={{fontSize:10,color:C.textS,marginBottom:3}}>بوابة العميل</div>
             <div style={{color:C.text,fontSize:13,fontWeight:700}}>{clientData.name}</div>
-            <div style={{marginTop:5}}><Bdg label={clientData.status==="active"?"نشط":"موقوف"} color={clientData.status==="active"?C.green:C.orange}/></div>
+            <div style={{marginTop:5}}><Bdg label={clientData.status==="active"?"نشط":clientData.status==="pending"?"قيد التفعيل":"موقوف"} color={clientData.status==="active"?C.green:clientData.status==="pending"?C.blue:C.orange}/></div>
           </div>
         </div>
         <nav style={{flex:1,padding:"10px 8px"}}>
