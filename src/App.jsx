@@ -1985,6 +1985,56 @@ function AddCampaignModal({open,onClose,onAdd,clients,currentUser}){
   );
 }
 
+const PLATFORM_STATS_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/platform-stats";
+const STAT_METRICS = [["spend","الإنفاق"],["impressions","مرات الظهور"],["swipes","السحبات"],["video_views","مشاهدات الفيديو"],["conversion_purchases","المشتريات"],["conversion_purchases_value","قيمة المشتريات"]];
+function AccStats({a}){
+  const iso=(d)=>d.toISOString().slice(0,10);
+  const [open,setOpen]=useState(false);
+  const [from,setFrom]=useState(iso(new Date(Date.now()-6*86400000)));
+  const [to,setTo]=useState(iso(new Date()));
+  const [sel,setSel]=useState(["spend","impressions","swipes"]);
+  const [data,setData]=useState(null);
+  const [err,setErr]=useState("");
+  const [busy,setBusy]=useState(false);
+  const load=async()=>{
+    if(!sel.length){setErr("اختار مقياس واحد على الأقل");return;}
+    setBusy(true);setErr("");
+    try{
+      const u=new URL(PLATFORM_STATS_URL);
+      u.searchParams.set("accountId",a.id);u.searchParams.set("from",from);u.searchParams.set("to",to);u.searchParams.set("metrics",sel.join(","));
+      const r=await wmAuthFetch(u.toString());const j=await r.json();
+      if(!r.ok||j.error){setErr(j.error==="needs_reauth"||j.error==="no_connection"?"لازم تعيد ربط الحساب":j.error==="forbidden"?"مش مسموح ليك بالحساب ده":"حصل خطأ في جلب الأرقام");setData(null);}
+      else setData(j);
+    }catch(e){setErr("حصل خطأ في الاتصال");}
+    setBusy(false);
+  };
+  const byCamp={};
+  (data?.rows||[]).forEach(r=>{const k=r.campaign_id;if(!byCamp[k])byCamp[k]={name:r.campaign_name||k,status:r.campaign_status,m:{}};sel.forEach(x=>{byCamp[k].m[x]=(byCamp[k].m[x]||0)+Number(r.metrics?.[x]||0);});});
+  const camps=Object.values(byCamp);
+  const lbl=Object.fromEntries(STAT_METRICS);
+  const inp={padding:"6px 8px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,color:C.text,fontSize:11,fontFamily:"Cairo",outline:"none"};
+  return(
+    <div style={{marginTop:10}}>
+      <button onClick={()=>{const n=!open;setOpen(n);if(n&&!data)load();}} style={{padding:"6px 12px",borderRadius:9,background:`${C.blue}15`,border:`1px solid ${C.blue}35`,color:C.blue,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{open?"إخفاء الحملات":"📈 عرض الحملات والأرقام"}</button>
+      {open&&<div style={{marginTop:10}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
+          <input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={inp}/>
+          <input type="date" value={to} onChange={e=>setTo(e.target.value)} style={inp}/>
+          {STAT_METRICS.map(([k,l])=><label key={k} style={{color:C.textS,fontSize:11,display:"flex",gap:4,alignItems:"center"}}><input type="checkbox" checked={sel.includes(k)} onChange={e=>setSel(e.target.checked?[...sel,k]:sel.filter(x=>x!==k))}/>{l}</label>)}
+          <button onClick={load} disabled={busy} style={{padding:"6px 12px",borderRadius:9,background:C.blue,border:"none",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{busy?"⏳":"تحديث"}</button>
+        </div>
+        {err&&<div style={{color:C.red,fontSize:11}}>{err}</div>}
+        {data&&!camps.length&&<div style={{color:C.textM,fontSize:11}}>مفيش حملات ليها أرقام في الفترة دي.</div>}
+        {camps.length>0&&<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11,color:C.text}}>
+          <thead><tr><th style={{textAlign:"right",padding:6}}>الحملة</th>{sel.map(k=><th key={k} style={{textAlign:"right",padding:6}}>{lbl[k]}</th>)}</tr></thead>
+          <tbody>{camps.map((c,i)=><tr key={i} style={{borderTop:`1px solid ${C.border}`}}><td style={{padding:6}}>{c.name}{c.status?` · ${c.status}`:""}</td>{sel.map(k=><td key={k} style={{padding:6}}>{(c.m[k]||0).toLocaleString("en-US",{maximumFractionDigits:2})}</td>)}</tr>)}</tbody>
+        </table></div>}
+        {data&&<div style={{color:C.textM,fontSize:10,marginTop:6}}>آخر جلب: {new Date(data.fetched_at).toLocaleString("ar-EG")}{data.cached?" (من الكاش — بيتجدد كل 5 دقائق)":""}</div>}
+      </div>}
+    </div>
+  );
+}
+
 function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnectSnap,onSyncNow,onSyncRange,metaSyncing,isAdmin}){
   const [rangeFrom,setRangeFrom]=useState("");
   const [rangeTo,setRangeTo]=useState("");
@@ -2010,7 +2060,7 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
           <select value={a.client_id||""} onChange={e=>onLinkAccount(a.id, e.target.value||null)}
             style={{padding:"8px 12px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none",minWidth:160}}>
             <option value="">— اختر العميل —</option>
-            {clients.filter(c=>c.id===a.client_id||!linkedClientIds.has(c.id)).map(c=>
+            {clients.filter(c=>c.id===a.client_id||!linked.some(x=>x.client_id===c.id&&x.platform===a.platform)).map(c=>
               <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           {isAdmin && a.client_id && (
@@ -2019,6 +2069,7 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
           )}
         </div>
         {a.last_synced_at && <div style={{color:C.textM,fontSize:10,marginTop:8}}>آخر مزامنة: {fmtDate(a.last_synced_at)}</div>}
+        {a.client_id && a.platform==="Snapchat" && <AccStats a={a}/>}
       </Card>
     );
   };
