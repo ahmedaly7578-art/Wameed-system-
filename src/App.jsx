@@ -2069,7 +2069,7 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
           )}
         </div>
         {a.last_synced_at && <div style={{color:C.textM,fontSize:10,marginTop:8}}>آخر مزامنة: {fmtDate(a.last_synced_at)}</div>}
-        {a.client_id && a.platform==="Snapchat" && <AccStats a={a}/>}
+        {(a.client_id||isAdmin) && a.platform==="Snapchat" && <AccStats a={a}/>}
       </Card>
     );
   };
