@@ -582,7 +582,7 @@ function ChurnTracker({clients,users}){
               const mb=users.find(u=>u.id===c.mb);
               return(<tr key={c.id} style={{borderBottom:`1px solid ${C.border}`}} onMouseEnter={e=>e.currentTarget.style.background=C.bgHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <td style={{padding:"12px 14px",color:C.text,fontSize:13,fontWeight:600}}>{c.name}</td>
-                <td style={{padding:"12px 14px",color:C.textS,fontSize:12}}>{c.pkg?.toLocaleString()} SAR</td>
+                <td style={{padding:"12px 14px",color:C.textS,fontSize:12}}>{c.pkg?`${c.pkg.toLocaleString()} SAR`:"—"}</td>
                 <td style={{padding:"12px 14px",color:C.textS,fontSize:12}}>{fmtDate(c.cancelDate||c.end)}</td>
                 <td style={{padding:"12px 14px"}}><span style={{background:`${C.red}18`,color:C.red,border:`1px solid ${C.red}33`,borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:600}}>{c.cancelReason||"غير محدد"}</span></td>
                 <td style={{padding:"12px 14px",color:C.textS,fontSize:12}}>{mb?.name||"—"}</td>
@@ -1090,7 +1090,7 @@ function ClientDetail({c,users,onBack,notes,setNotes,satisfaction,campaigns,setC
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:22}}>
           {[
             ["الإنفاق",`${(c.spend||0).toLocaleString()} SAR`,C.orange],
-            ["الباقة",`${(c.pkg||0).toLocaleString()} SAR`,C.green],
+            ["الباقة",c.pkg?`${c.pkg.toLocaleString()} SAR`:"غير محددة",C.green],
             ["ROAS",c.roas||"—",C.purple],
             ["تنتهي",d>0?`${d} يوم`:"انتهت",d<=7?C.red:d<=14?C.orange:C.text]
           ].map(([l,v,co],i)=>(
@@ -1116,7 +1116,7 @@ function ClientDetail({c,users,onBack,notes,setNotes,satisfaction,campaigns,setC
             <Card>
               <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:14}}>معلومات العميل</div>
               {[
-                ["الباقة",`${(c.pkg||0).toLocaleString()} SAR/شهر`],
+                ["الباقة",c.pkg?`${c.pkg.toLocaleString()} SAR/شهر`:"غير محددة"],
                 ["المنصات",(c.platforms||[]).join(" · ")||"—"],
                 ["Media Buyer",mb?.name||"—"],
                 ["Social Media",sm?.name||"—"],
@@ -1235,7 +1235,7 @@ function ClientDetail({c,users,onBack,notes,setNotes,satisfaction,campaigns,setC
             <div style={{fontSize:32,marginBottom:10}}>🔄</div>
             <div style={{color:C.text,fontSize:15,fontWeight:700,marginBottom:8}}>اشتراك {c.name}</div>
             <div style={{color:d<=7?C.red:d<=14?C.orange:C.green,fontSize:28,fontWeight:800,marginBottom:4}}>
-              {d>0?`${d} يوم متبقي`:"انتهى الاشتراك"}
+              {!c.end?"تاريخ الانتهاء غير محدد":d>0?`${d} يوم متبقي`:"انتهى الاشتراك"}
             </div>
             <div style={{color:C.textS,fontSize:13}}>ينتهي: {c.end?fmtDate(c.end):"—"}</div>
             {d<=14&&d>0&&<div style={{marginTop:16,display:"inline-block",padding:"8px 20px",background:`${d<=7?C.red:C.orange}18`,border:`1px solid ${d<=7?C.red:C.orange}33`,borderRadius:10,color:d<=7?C.red:C.orange,fontSize:12,fontWeight:600}}>{d<=7?"🚨 تجديد عاجل":"⚠️ قارب على الانتهاء"}</div>}
@@ -1317,11 +1317,11 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
                         onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                         <td style={{padding:"12px 14px"}}><div style={{color:C.text,fontSize:13,fontWeight:600}}>{c.name}</div></td>
                         <td style={{padding:"12px 14px"}}><Bdg label={SL[c.status]||"—"} color={SC[c.status]||C.textM}/></td>
-                        <td style={{padding:"12px 14px",color:C.textS,fontSize:13}}>{(c.pkg||0).toLocaleString()} SAR</td>
+                        <td style={{padding:"12px 14px",color:C.textS,fontSize:13}}>{c.pkg?`${c.pkg.toLocaleString()} SAR`:"—"}</td>
                         <td style={{padding:"12px 14px"}}><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{(c.platforms||[]).map(p=><PT key={p} name={p}/>)}</div></td>
                         <td style={{padding:"12px 14px",color:C.textS,fontSize:12}}>{mb?.name||"—"}</td>
                         <td style={{padding:"12px 14px"}}><span style={{color:(c.roas||0)>=3?C.green:C.orange,fontWeight:700,fontSize:14}}>{c.roas||"—"}</span></td>
-                        <td style={{padding:"12px 14px"}}><span style={{color:d<=7?C.red:d<=14?C.orange:C.textS,fontSize:12,fontWeight:600}}>{d>0?`${d} يوم`:"انتهى"}</span></td>
+                        <td style={{padding:"12px 14px"}}><span style={{color:!c.end?C.textM:d<=7?C.red:d<=14?C.orange:C.textS,fontSize:12,fontWeight:600}}>{!c.end?"—":d>0?`${d} يوم`:"انتهى"}</span></td>
                         <td style={{padding:"12px 14px"}}>{c.email?<Bdg label="✓ مفعّلة" color={C.green}/>:<span style={{color:C.textM,fontSize:11}}>—</span>}</td>
                         <td style={{padding:"12px 14px"}}>
                           <div style={{display:"flex",gap:6}}>
@@ -2026,7 +2026,7 @@ function AccStats({a}){
         {err&&<div style={{color:C.red,fontSize:11}}>{err}</div>}
         {data&&!camps.length&&<div style={{color:C.textM,fontSize:11}}>مفيش حملات في الحساب ده.</div>}
         {camps.length>0&&<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11,color:C.text}}>
-          <thead><tr><th style={{textAlign:"right",padding:6}}>الحملة</th>{sel.map(k=><th key={k} style={{textAlign:"right",padding:6}}>{lbl[k]}</th>)}</tr></thead>
+          <thead><tr><th style={{textAlign:"right",padding:6}}>الحملة</th>{sel.map(k=><th key={k} style={{textAlign:"right",padding:6}}>{lbl[k]}{(k==="spend"||k==="conversion_purchases_value")?` (${data?.currency||"عملة غير معروفة"})`:""}</th>)}</tr></thead>
           <tbody>{camps.map((c,i)=><tr key={i} style={{borderTop:`1px solid ${C.border}`}}><td style={{padding:6}}>{c.name}{c.status?` · ${c.status}`:""}{c.noData?" · بدون أرقام في الفترة":""}</td>{sel.map(k=><td key={k} style={{padding:6}}>{c.noData?"—":(c.m[k]||0).toLocaleString("en-US",{maximumFractionDigits:2})}</td>)}</tr>)}</tbody>
         </table></div>}
         {data&&<div style={{color:C.textM,fontSize:10,marginTop:6}}>آخر جلب: {new Date(data.fetched_at).toLocaleString("ar-EG")}{data.cached?" (من الكاش — ممكن يكون متخزن لحد 5 دقائق)":""}</div>}
@@ -2951,7 +2951,7 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16}}>
                 <Card>
                   <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:16}}>بيانات الباقة</div>
-                  {[["اسم الباقة","باقة "+clientData.pkg.toLocaleString()+" SAR"],["القيمة الشهرية",clientData.pkg.toLocaleString()+" SAR"],["المنصات",clientData.platforms.join(" · ")],["تاريخ البداية",fmtDate(clientData.start)],["تاريخ الانتهاء",fmtDate(clientData.end)],["الحالة",clientData.status==="active"?"✅ نشط":"⏸ موقوف"]].map(([l,v],i)=>(
+                  {[["اسم الباقة",(clientData.pkg?"باقة "+clientData.pkg.toLocaleString()+" SAR":"غير محددة")],["القيمة الشهرية",clientData.pkg?clientData.pkg.toLocaleString()+" SAR":"غير محددة"],["المنصات",clientData.platforms.join(" · ")],["تاريخ البداية",fmtDate(clientData.start)],["تاريخ الانتهاء",fmtDate(clientData.end)],["الحالة",clientData.status==="active"?"✅ نشط":"⏸ موقوف"]].map(([l,v],i)=>(
                     <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:`1px solid ${C.border}`}}>
                       <span style={{color:C.textS,fontSize:12}}>{l}</span>
                       <span style={{color:C.text,fontSize:12,fontWeight:600}}>{v}</span>
@@ -2962,8 +2962,8 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
                   <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:16}}>حالة الاشتراك</div>
                   <div style={{textAlign:"center",padding:"30px 0"}}>
                     <div style={{fontSize:56,marginBottom:12}}>{d>0?"📅":"⏰"}</div>
-                    <div style={{color:d<=7?C.red:d<=14?C.orange:C.green,fontSize:36,fontWeight:900,marginBottom:6}}>{d>0?`${d} يوم`:"انتهى"}</div>
-                    <div style={{color:C.textS,fontSize:13,marginBottom:20}}>{d>0?"متبقي على انتهاء الاشتراك":"انتهى الاشتراك، تواصل للتجديد"}</div>
+                    <div style={{color:d<=7?C.red:d<=14?C.orange:C.green,fontSize:36,fontWeight:900,marginBottom:6}}>{!clientData.end?"غير محدد":d>0?`${d} يوم`:"انتهى"}</div>
+                    <div style={{color:C.textS,fontSize:13,marginBottom:20}}>{!clientData.end?"تاريخ الانتهاء لم يُحدد بعد":d>0?"متبقي على انتهاء الاشتراك":"انتهى الاشتراك، تواصل للتجديد"}</div>
                     {d<=14&&<div style={{background:d<=7?`${C.red}15`:`${C.orange}15`,border:`1px solid ${d<=7?C.red:C.orange}33`,borderRadius:12,padding:"12px 16px",color:d<=7?C.red:C.orange,fontSize:12,fontWeight:600}}>
                       {d<=7?"🚨 يرجى التجديد فوراً للاستمرار":"⚠️ قارب الاشتراك على الانتهاء"}
                     </div>}
