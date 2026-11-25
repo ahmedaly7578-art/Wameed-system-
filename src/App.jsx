@@ -2932,6 +2932,8 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
   );
 }
 
+const PORTAL_API="https://jokdohhukkbrergfauwc.supabase.co/functions/v1/client-portal";
+const PORTAL_KEY="sb_publishable_DkwiFcNG0im57wftL-lATw_l4Z1TCvs";
 // ═══ LOGIN ════════════════════════════════════════════════════════════════════
 function Login({onLogin}){
   const [em,setEm]=useState("");const [pw,setPw]=useState("");const [show,setShow]=useState(false);
@@ -2943,26 +2945,32 @@ function Login({onLogin}){
     if(!em||!pw){setErr("أدخل البيانات");setShake(true);setTimeout(()=>setShake(false),600);return;}
     setLoading(true);setErr("");
     try{
-      // 1. Check team members FIRST (local users from localStorage or initial data)
-      const localUsers=JSON.parse(localStorage.getItem("w_users")||JSON.stringify(IU));
-      const teamUser=localUsers.find(u=>u.email===em&&u.password===pw);
-      if(teamUser){onLogin({type:"team",...teamUser,avatarUrl:teamUser.avatarUrl||teamUser.avatar_url});setLoading(false);return;}
-
-      // 2. Try Supabase Auth for team members
+      // Staff: real Supabase Auth only (demo/localStorage logins removed).
       if(window.__SB){
         try{
           const {data,error}=await window.__SB.auth.signInWithPassword({email:em,password:pw});
           if(!error&&data?.user){
-            const {data:profile}=await window.__SB.from("users").select("*").eq("email",em).single();
-            if(profile){onLogin({type:"team",...profile,avatar:profile.avatar||ini(profile.name),avatarUrl:profile.avatar_url});setLoading(false);return;}
+            const {data:profile}=await window.__SB.from("users").select("id,email,name,role,avatar,avatar_url,is_active,is_head_of,auth_id").ilike("email",em).maybeSingle();
+            if(profile&&profile.is_active!==false){
+              if(window.__loadFromDB)await window.__loadFromDB();
+              onLogin({type:"team",...profile,avatar:profile.avatar||ini(profile.name),avatarUrl:profile.avatar_url});setLoading(false);return;
+            }
+            await window.__SB.auth.signOut();
           }
         }catch(e){}
       }
-
-      // 3. Check client portal accounts LAST
-      const allClients=JSON.parse(localStorage.getItem("w_clients")||JSON.stringify(IC));
-      const clientUser=allClients.find(c=>c.email===em&&c.password===pw);
-      if(clientUser){onLogin({type:"client",...clientUser});setLoading(false);return;}
+      // Client portal: checked on the server; the password never reaches the browser.
+      try{
+        const r=await fetch(`${PORTAL_API}/login`,{method:"POST",headers:{"content-type":"application/json",apikey:PORTAL_KEY},body:JSON.stringify({email:em,password:pw})});
+        if(r.status===429){setErr("محاولات كثيرة، حاول بعد 15 دقيقة");setLoading(false);return;}
+        if(r.ok){
+          const {token,client}=await r.json();
+          sessionStorage.setItem("w_portal_token",token);
+          const d=await fetch(`${PORTAL_API}/data`,{headers:{"x-portal-token":token,apikey:PORTAL_KEY}}).then(x=>x.json());
+          if(window.__setPortalData)window.__setPortalData(d);
+          onLogin({type:"client",...(d.client||client)});setLoading(false);return;
+        }
+      }catch(e){}
 
       throw new Error("not found");
     }catch(e){
@@ -3103,7 +3111,16 @@ export default function App(){
     if (!url || !key) return;
     import("https://esm.sh/@supabase/supabase-js@2").then(({createClient}) => {
       window.__SB = createClient(url, key);
-      loadFromDB();
+      window.__loadFromDB = loadFromDB;
+      window.__setPortalData = (d) => {
+        if(d?.client) setClientsRaw([{...d.client,mb:null,sm:null,am:null,pkg:d.client.pkg_amount,start:d.client.start_date,end:d.client.end_date,spend:d.client.total_spend}]);
+        if(d?.campaigns) setCampaignsRaw(d.campaigns.map(c=>({...c,clientId:c.client_id,week:c.week_start,purchaseValue:c.purchase_value})));
+      };
+      // Only load data when a real Supabase session exists; otherwise drop any stale local team login.
+      window.__SB.auth.getSession().then(({data}) => {
+        if (data?.session) { loadFromDB(); }
+        else { setUserRaw(u => (u && u.type === "team") ? null : u); }
+      });
     }).catch((err) => console.error("Failed to load supabase-js:", err));
   }, []);
 
@@ -3163,8 +3180,8 @@ export default function App(){
         {data:dU}, {data:dC}, {data:dF}, {data:dCa},
         {data:dT}, {data:dS}, {data:dP}, {data:dAA}
       ] = await Promise.all([
-        window.__SB.from("users").select("*"),
-        window.__SB.from("clients").select("*"),
+        window.__SB.from("users").select("id,email,name,role,avatar,avatar_url,is_active,is_head_of,auth_id"),
+        window.__SB.from("clients").select("id,name,email,pkg_amount,platforms,status,mb_id,sm_id,am_id,start_date,end_date,roas,total_spend,notes,cancel_reason,cancel_date,created_at,updated_at"),
         window.__SB.from("follow_ups").select("*").order("created_at",{ascending:false}),
         window.__SB.from("campaigns").select("*").order("week_start",{ascending:false}),
         window.__SB.from("tasks").select("*"),
@@ -3177,7 +3194,7 @@ export default function App(){
         // الأدمن الأساسي (IU[0]) لازم يفضل موجود دايمًا حتى لو قاعدة البيانات
         // فيها بيانات، عشان تسجيل الدخول ميتقفلش عليه أبدًا.
         const hasSuperAdmin = v.some(u=>u.email===IU[0].email);
-        const merged = hasSuperAdmin ? v : [IU[0], ...v];
+        const merged = v;
         setUsersRaw(merged); ls.set("w_users",merged);
       }
       if(dC?.length) { const v=dC.map(c=>({...c,mb:c.mb_id,sm:c.sm_id,am:c.am_id,pkg:c.pkg_amount,start:c.start_date,end:c.end_date,spend:c.total_spend})); setClientsRaw(v); ls.set("w_clients",v); }
