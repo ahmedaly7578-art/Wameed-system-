@@ -2010,7 +2010,7 @@ function AccStats({a}){
   };
   const byCamp={};
   (data?.rows||[]).forEach(r=>{const k=r.campaign_id;if(!byCamp[k])byCamp[k]={name:r.campaign_name||k,status:r.campaign_status,m:{}};sel.forEach(x=>{byCamp[k].m[x]=(byCamp[k].m[x]||0)+Number(r.metrics?.[x]||0);});});
-  const camps=Object.values(byCamp);
+  (data?.campaigns||[]).forEach(c=>{if(!byCamp[c.id])byCamp[c.id]={name:c.name||c.id,status:c.status,m:{},noData:true};});const camps=Object.values(byCamp);
   const lbl=Object.fromEntries(STAT_METRICS);
   const inp={padding:"6px 8px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,color:C.text,fontSize:11,fontFamily:"Cairo",outline:"none"};
   return(
@@ -2024,10 +2024,10 @@ function AccStats({a}){
           <button onClick={load} disabled={busy} style={{padding:"6px 12px",borderRadius:9,background:C.blue,border:"none",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{busy?"⏳":"تحديث"}</button>
         </div>
         {err&&<div style={{color:C.red,fontSize:11}}>{err}</div>}
-        {data&&!camps.length&&<div style={{color:C.textM,fontSize:11}}>مفيش حملات ليها أرقام في الفترة دي.</div>}
+        {data&&!camps.length&&<div style={{color:C.textM,fontSize:11}}>مفيش حملات في الحساب ده.</div>}
         {camps.length>0&&<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11,color:C.text}}>
           <thead><tr><th style={{textAlign:"right",padding:6}}>الحملة</th>{sel.map(k=><th key={k} style={{textAlign:"right",padding:6}}>{lbl[k]}</th>)}</tr></thead>
-          <tbody>{camps.map((c,i)=><tr key={i} style={{borderTop:`1px solid ${C.border}`}}><td style={{padding:6}}>{c.name}{c.status?` · ${c.status}`:""}</td>{sel.map(k=><td key={k} style={{padding:6}}>{(c.m[k]||0).toLocaleString("en-US",{maximumFractionDigits:2})}</td>)}</tr>)}</tbody>
+          <tbody>{camps.map((c,i)=><tr key={i} style={{borderTop:`1px solid ${C.border}`}}><td style={{padding:6}}>{c.name}{c.status?` · ${c.status}`:""}{c.noData?" · بدون أرقام في الفترة":""}</td>{sel.map(k=><td key={k} style={{padding:6}}>{c.noData?"—":(c.m[k]||0).toLocaleString("en-US",{maximumFractionDigits:2})}</td>)}</tr>)}</tbody>
         </table></div>}
         {data&&<div style={{color:C.textM,fontSize:10,marginTop:6}}>آخر جلب: {new Date(data.fetched_at).toLocaleString("ar-EG")}{data.cached?" (من الكاش — ممكن يكون متخزن لحد 5 دقائق)":""}</div>}
       </div>}
