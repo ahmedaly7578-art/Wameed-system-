@@ -30,12 +30,12 @@ const CAMPAIGNS_SYNC_FUNCTION_URL = "https://jokdohhukkbrergfauwc.supabase.co/fu
 const PC={Meta:"#1877F2",TikTok:"#EE1D52",Snapchat:"#B8A000",Google:"#4285F4",YouTube:"#FF0000",X:"#1DA1F2"};
 
 const IU=[
-  {id:1,name:"أحمد علي",role:"admin",email:"ahmed@wameed.sa",password:"admin123",avatar:"أع"},
-  {id:2,name:"كريم محمد",role:"media_buyer",email:"karim@wameed.sa",password:"pass123",avatar:"كم"},
-  {id:3,name:"سارة أحمد",role:"social_media",email:"sara@wameed.sa",password:"pass123",avatar:"سأ"},
-  {id:4,name:"محمود رضا",role:"account_manager",email:"mahmoud@wameed.sa",password:"pass123",avatar:"مر"},
-  {id:5,name:"هدى سعد",role:"media_buyer",email:"hoda@wameed.sa",password:"pass123",avatar:"هس"},
-  {id:6,name:"هادي يحيى",role:"media_buyer",email:"hady@wameed.sa",password:"pass123",avatar:"هي"},
+  {id:1,name:"أحمد علي",role:"admin",email:"ahmed@wameed.sa",password:"",avatar:"أع"},
+  {id:2,name:"كريم محمد",role:"media_buyer",email:"karim@wameed.sa",password:"",avatar:"كم"},
+  {id:3,name:"سارة أحمد",role:"social_media",email:"sara@wameed.sa",password:"",avatar:"سأ"},
+  {id:4,name:"محمود رضا",role:"account_manager",email:"mahmoud@wameed.sa",password:"",avatar:"مر"},
+  {id:5,name:"هدى سعد",role:"media_buyer",email:"hoda@wameed.sa",password:"",avatar:"هس"},
+  {id:6,name:"هادي يحيى",role:"media_buyer",email:"hady@wameed.sa",password:"",avatar:"هي"},
 ];
 const IC=[
   {id:1,name:"متجر النور",mb:2,sm:3,am:4,pkg:3000,platforms:["Meta","Snapchat"],status:"active",start:"2025-01-15",end:"2025-05-30",roas:3.8,spend:12000,notes:"عميل وفي، يطلب تقارير أسبوعية دائماً",email:"nour@client.sa",password:"client123"},
