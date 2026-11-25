@@ -2470,19 +2470,11 @@ function TeamMgmt({users,setUsers}){
         if(users.find(u=>u.email===f.email)){setErr("البريد مستخدم");setSaving(false);return;}
         // Create Supabase Auth login account (admin.createUser needs a service-role
         // key that can never be exposed client-side, so we go straight to signUp)
-        let authId=null;
-        if(window.__SB){
-          const {data:sd,error:signErr}=await window.__SB.auth.signUp({email:f.email,password:f.password});
-          if(signErr){
-            console.error("فشل إنشاء حساب الدخول:",signErr.message);
-          }else if(sd?.user){
-            authId=sd.user.id;
-          }
-          // Insert into users table
-          const {error:insErr}=await window.__SB.from("users").insert({name:f.name,email:f.email,role:f.role,avatar:av});
-          if(insErr) console.error("فشل حفظ بيانات المستخدم في الجدول:",insErr.message);
-        }
-        setUsers(p=>[...p,{id:authId||Date.now(),...f,avatar:av}]);
+        if(f.password.length<8){setErr("كلمة المرور لازم تكون 8 حروف على الأقل");setSaving(false);return;}
+        const rr=await wmAuthFetch("https://jokdohhukkbrergfauwc.supabase.co/functions/v1/create-staff",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:f.name,email:f.email,password:f.password,role:f.role})});
+        const jj=await rr.json().catch(()=>({}));
+        if(!rr.ok||!jj.ok){setErr(jj.error==="email_exists"?"البريد مستخدم":jj.error==="forbidden"?"الإضافة للمدير فقط":jj.error==="bad_request"?"راجع البيانات (بريد صحيح وكلمة مرور 8+)":"فشل إنشاء الموظف");setSaving(false);return;}
+        setUsers(p=>[...p,{id:jj.id||Date.now(),...f,avatar:av}]);
       }
       setOpen(false);setErr("");
     }catch(e){setErr("حدث خطأ — تحقق من الاتصال");}
