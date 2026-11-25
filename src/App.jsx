@@ -21,7 +21,7 @@ const wmToken=async()=>{for(let i=0;i<60&&!window.__SB;i++)await new Promise(r=>
 const wmAuthFetch=async(url,opts={})=>{const t=await wmToken();return fetch(url,{...opts,headers:{...(opts.headers||{}),Authorization:`Bearer ${t}`,apikey:"sb_publishable_DkwiFcNG0im57wftL-lATw_l4Z1TCvs"}});};
 
 // ─── Snapchat OAuth — same idea, different platform ──────────────────────────
-const SNAP_CLIENT_ID = "145b2dbd-ed2a-49bc-bb11-e370d4522eb9";
+const SNAP_CLIENT_ID = "7ae89022-dcbf-4d7d-acbd-0a9e2d598ec4";
 const SNAP_REDIRECT_URI = "https://wameed-system.vercel.app/api/auth/callback/snapchat";
 const SNAP_OAUTH_FUNCTION_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/snap-oauth-exchange";
 
