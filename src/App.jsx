@@ -3217,9 +3217,9 @@ export default function App(){
     const state = params.get("state");
     if (!code) return;
     const isSnap = window.location.pathname === "/api/auth/callback/snapchat";
-    const expectedState = ls.get("w_metaOauthState", null);
+    const expectedState = ls.get("w_metaOauthState", null); ls.set("w_metaOauthState", null);
     window.history.replaceState({}, "", "/");
-    if (expectedState && state !== expectedState) { alert("فشل التحقق من الاتصال، حاول تاني."); return; }
+    if (!expectedState || state !== expectedState) { alert("فشل التحقق من الاتصال، حاول تاني."); return; }
     setMetaSyncing(true);
     setPage("campaigns");
     setCampaignsTab("businesses");
