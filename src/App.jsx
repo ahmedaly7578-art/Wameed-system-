@@ -16,17 +16,17 @@ const META_REDIRECT_URI = "https://wameed-system.vercel.app/api/auth/callback/fa
 // Format: https://<project-ref>.functions.supabase.co/meta-oauth-exchange
 const META_OAUTH_FUNCTION_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/meta-oauth-exchange";
 // Must match the META_OAUTH_SECRET you set as a Supabase secret for that function.
-const META_OAUTH_CALL_SECRET = "wm2026SecretKey!9x";
+// Staff session token for server functions (admin-checked on the server). No shared secrets in the browser.
+const wmToken=async()=>{for(let i=0;i<60&&!window.__SB;i++)await new Promise(r=>setTimeout(r,100));const s=window.__SB?await window.__SB.auth.getSession():null;return s?.data?.session?.access_token||"";};
+const wmAuthFetch=async(url,opts={})=>{const t=await wmToken();return fetch(url,{...opts,headers:{...(opts.headers||{}),Authorization:`Bearer ${t}`,apikey:"sb_publishable_DkwiFcNG0im57wftL-lATw_l4Z1TCvs"}});};
 
 // ─── Snapchat OAuth — same idea, different platform ──────────────────────────
 const SNAP_CLIENT_ID = "145b2dbd-ed2a-49bc-bb11-e370d4522eb9";
 const SNAP_REDIRECT_URI = "https://wameed-system.vercel.app/api/auth/callback/snapchat";
 const SNAP_OAUTH_FUNCTION_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/snap-oauth-exchange";
-const SNAP_OAUTH_CALL_SECRET = "wm2026SnapKey!7q";
 
 // ─── Campaigns sync (pulls real numbers from Meta + Snapchat into `campaigns`) ──
 const CAMPAIGNS_SYNC_FUNCTION_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/campaigns-sync";
-const CAMPAIGNS_SYNC_CALL_SECRET = "wm2026SyncKey!3z";
 const PC={Meta:"#1877F2",TikTok:"#EE1D52",Snapchat:"#B8A000",Google:"#4285F4",YouTube:"#FF0000",X:"#1DA1F2"};
 
 const IU=[
@@ -198,7 +198,6 @@ const NAV=[
 
 // ═══ AVATAR UPLOAD ════════════════════════════════════════════════════════════
 const AVATAR_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/avatar-upload";
-const AVATAR_API_SECRET = "wameed-avatar-4d9f2c7b1e5a8036";
 
 function EditAvatarModal({open,onClose,currentUser,onSaved}){
   const [preview,setPreview]=useState(currentUser?.avatarUrl||"");
@@ -230,7 +229,7 @@ function EditAvatarModal({open,onClose,currentUser,onSaved}){
         reader.readAsDataURL(file);
       });
       const ext=(file.type.split("/")[1]||"png").replace("jpeg","jpg");
-      const res=await fetch(`${AVATAR_API}?secret=${encodeURIComponent(AVATAR_API_SECRET)}`,{
+      const res=await wmAuthFetch(AVATAR_API,{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({userId:currentUser.id, imageBase64:b64, fileExt:ext}),
@@ -3126,11 +3125,10 @@ export default function App(){
 
   // ─── CREATIVE MODULE — الجوجل شيت هو قاعدة البيانات، مباشرة، من غير Supabase ─
   const CREATIVE_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/creative-sheet-api";
-  const CREATIVE_API_SECRET = "wameed-creative-9f3a7b2e1d8c4f6a";
-  const creativeUrl = () => `${CREATIVE_API}?secret=${encodeURIComponent(CREATIVE_API_SECRET)}`;
+  const creativeUrl = () => CREATIVE_API;
   const loadCreativeFromSheet = async () => {
     try {
-      const res = await fetch(creativeUrl());
+      const res = await wmAuthFetch(creativeUrl());
       const data = await res.json();
       if (data?.tasks) { setCreativeTasksRaw(data.tasks); ls.set("w_creative", data.tasks); }
     } catch(e) { console.error("Failed to load creative tasks from sheet:", e); }
@@ -3139,11 +3137,10 @@ export default function App(){
 
   // ─── MOTION MODULE — نفس الفكرة، الشيت هو قاعدة البيانات مباشرة ─────────────
   const MOTION_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/motion-sheet-api";
-  const MOTION_API_SECRET = "wameed-motion-7c2e9a4f1b6d8e3a";
-  const motionUrl = () => `${MOTION_API}?secret=${encodeURIComponent(MOTION_API_SECRET)}`;
+  const motionUrl = () => MOTION_API;
   const loadMotionFromSheet = async () => {
     try {
-      const res = await fetch(motionUrl());
+      const res = await wmAuthFetch(motionUrl());
       const data = await res.json();
       if (data?.tasks) { setMotionTasksRaw(data.tasks); ls.set("w_motion", data.tasks); }
     } catch(e) { console.error("Failed to load motion tasks from sheet:", e); }
@@ -3153,11 +3150,10 @@ export default function App(){
   // ─── MEDIA RENEWALS — تاب شهري تلقائي جوه شيت التجديدات ─────────────────────
   const MEDIA_RENEWALS_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/media-renewals-sheet-api";
   const MEDIA_RENEWALS_ROLLOVER_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/media-renewals-rollover";
-  const MEDIA_RENEWALS_SECRET = "wameed-media-renew-9f3b6e1a4c7d2058";
-  const mediaRenewalsUrl = () => `${MEDIA_RENEWALS_API}?secret=${encodeURIComponent(MEDIA_RENEWALS_SECRET)}`;
+  const mediaRenewalsUrl = () => MEDIA_RENEWALS_API;
   const loadMediaRenewalsFromSheet = async () => {
     try {
-      const res = await fetch(mediaRenewalsUrl());
+      const res = await wmAuthFetch(mediaRenewalsUrl());
       const data = await res.json();
       setMediaTabInfo({ tab: data.tab, exists: data.exists });
       if (data?.tasks) { setMediaRenewalsRaw(data.tasks); ls.set("w_mediaRenewals", data.tasks); }
@@ -3166,7 +3162,7 @@ export default function App(){
   const runMediaRollover = async () => {
     setRollingOverMedia(true);
     try {
-      await fetch(`${MEDIA_RENEWALS_ROLLOVER_API}?secret=${encodeURIComponent(MEDIA_RENEWALS_SECRET)}`, { method: "POST" });
+      await wmAuthFetch(MEDIA_RENEWALS_ROLLOVER_API, { method: "POST" });
       await loadMediaRenewalsFromSheet();
     } catch(e) { console.error("Media rollover failed:", e); }
     setRollingOverMedia(false);
@@ -3228,12 +3224,9 @@ export default function App(){
     setPage("campaigns");
     setCampaignsTab("businesses");
     const fnUrl = isSnap ? SNAP_OAUTH_FUNCTION_URL : META_OAUTH_FUNCTION_URL;
-    const callSecret = isSnap ? SNAP_OAUTH_CALL_SECRET : META_OAUTH_CALL_SECRET;
     const url = new URL(fnUrl);
     url.searchParams.set("code", code);
-    url.searchParams.set("secret", callSecret);
-    if (user?.id) url.searchParams.set("userId", user.id);
-    fetch(url.toString())
+    wmAuthFetch(url.toString())
       .then(r => r.json())
       .then(res => {
         if (res.error) { alert("حصل خطأ في الربط: " + res.error); return; }
@@ -3377,13 +3370,13 @@ export default function App(){
         try{
           if (next.length > prev.length) {
             const t = next[next.length-1];
-            await fetch(creativeUrl(), {...opts, method:"POST", body: JSON.stringify(t)});
+            await wmAuthFetch(creativeUrl(), {...opts, method:"POST", body: JSON.stringify(t)});
           } else if (next.length < prev.length) {
             const removed = prev.find(t => !next.find(x => x.id === t.id));
-            if (removed) await fetch(creativeUrl(), {...opts, method:"DELETE", body: JSON.stringify({id: removed.id})});
+            if (removed) await wmAuthFetch(creativeUrl(), {...opts, method:"DELETE", body: JSON.stringify({id: removed.id})});
           } else {
             const changed = next.find((t,i) => JSON.stringify(t) !== JSON.stringify(prev[i]));
-            if (changed) await fetch(creativeUrl(), {...opts, method:"PUT", body: JSON.stringify(changed)});
+            if (changed) await wmAuthFetch(creativeUrl(), {...opts, method:"PUT", body: JSON.stringify(changed)});
           }
         }catch(e){ console.error("Creative sheet sync failed:", e); }
         setCreativeTasks(next);
@@ -3400,13 +3393,13 @@ export default function App(){
         try{
           if (next.length > prev.length) {
             const t = next[next.length-1];
-            await fetch(motionUrl(), {...opts, method:"POST", body: JSON.stringify(t)});
+            await wmAuthFetch(motionUrl(), {...opts, method:"POST", body: JSON.stringify(t)});
           } else if (next.length < prev.length) {
             const removed = prev.find(t => !next.find(x => x.id === t.id));
-            if (removed) await fetch(motionUrl(), {...opts, method:"DELETE", body: JSON.stringify({id: removed.id})});
+            if (removed) await wmAuthFetch(motionUrl(), {...opts, method:"DELETE", body: JSON.stringify({id: removed.id})});
           } else {
             const changed = next.find((t,i) => JSON.stringify(t) !== JSON.stringify(prev[i]));
-            if (changed) await fetch(motionUrl(), {...opts, method:"PUT", body: JSON.stringify(changed)});
+            if (changed) await wmAuthFetch(motionUrl(), {...opts, method:"PUT", body: JSON.stringify(changed)});
           }
         }catch(e){ console.error("Motion sheet sync failed:", e); }
         setMotionTasks(next);
@@ -3426,13 +3419,13 @@ export default function App(){
         try{
           if (next.length > prev.length) {
             const t = next[next.length-1];
-            await fetch(mediaRenewalsUrl(), {...opts, method:"POST", body: JSON.stringify(t)});
+            await wmAuthFetch(mediaRenewalsUrl(), {...opts, method:"POST", body: JSON.stringify(t)});
           } else if (next.length < prev.length) {
             const removed = prev.find(t => !next.find(x => x.id === t.id));
-            if (removed) await fetch(mediaRenewalsUrl(), {...opts, method:"DELETE", body: JSON.stringify({id: removed.id})});
+            if (removed) await wmAuthFetch(mediaRenewalsUrl(), {...opts, method:"DELETE", body: JSON.stringify({id: removed.id})});
           } else {
             const changed = next.find((t,i) => JSON.stringify(t) !== JSON.stringify(prev[i]));
-            if (changed) await fetch(mediaRenewalsUrl(), {...opts, method:"PUT", body: JSON.stringify(changed)});
+            if (changed) await wmAuthFetch(mediaRenewalsUrl(), {...opts, method:"PUT", body: JSON.stringify(changed)});
           }
         }catch(e){ console.error("Media renewals sheet sync failed:", e); }
         setMediaRenewals(next);
@@ -3464,9 +3457,8 @@ export default function App(){
         setMetaSyncing(true);
         try{
           const url = new URL(CAMPAIGNS_SYNC_FUNCTION_URL);
-          url.searchParams.set("secret", CAMPAIGNS_SYNC_CALL_SECRET);
           if(accountId) url.searchParams.set("accountId", accountId);
-          const res = await fetch(url.toString()).then(r=>r.json());
+          const res = await wmAuthFetch(url.toString()).then(r=>r.json());
           if(res.error){ alert("حصل خطأ في المزامنة: "+res.error); return; }
           const [{data:dCa},{data:dAA}] = await Promise.all([
             window.__SB.from("campaigns").select("*").order("week_start",{ascending:false}),
@@ -3482,10 +3474,9 @@ export default function App(){
         setMetaSyncing(true);
         try{
           const url = new URL(CAMPAIGNS_SYNC_FUNCTION_URL);
-          url.searchParams.set("secret", CAMPAIGNS_SYNC_CALL_SECRET);
           url.searchParams.set("from", from);
           if(to) url.searchParams.set("to", to);
-          const res = await fetch(url.toString()).then(r=>r.json());
+          const res = await wmAuthFetch(url.toString()).then(r=>r.json());
           if(res.error){ alert("حصل خطأ في الاستيراد: "+res.error); return; }
           const [{data:dCa},{data:dAA}] = await Promise.all([
             window.__SB.from("campaigns").select("*").order("week_start",{ascending:false}),
