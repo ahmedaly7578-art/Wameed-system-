@@ -2950,7 +2950,7 @@ function Login({onLogin}){
         try{
           const {data,error}=await window.__SB.auth.signInWithPassword({email:em,password:pw});
           if(!error&&data?.user){
-            const {data:profile}=await window.__SB.from("users").select("id,email,name,role,avatar,avatar_url,is_active,is_head_of,auth_id").ilike("email",em).maybeSingle();
+            const {data:profile}=await window.__SB.from("users").select("id,email,name,role,avatar,avatar_url,is_active,auth_id").ilike("email",em).maybeSingle();
             if(profile&&profile.is_active!==false){
               if(window.__loadFromDB)await window.__loadFromDB();
               onLogin({type:"team",...profile,avatar:profile.avatar||ini(profile.name),avatarUrl:profile.avatar_url});setLoading(false);return;
@@ -3180,7 +3180,7 @@ export default function App(){
         {data:dU}, {data:dC}, {data:dF}, {data:dCa},
         {data:dT}, {data:dS}, {data:dP}, {data:dAA}
       ] = await Promise.all([
-        window.__SB.from("users").select("id,email,name,role,avatar,avatar_url,is_active,is_head_of,auth_id"),
+        window.__SB.from("users").select("id,email,name,role,avatar,avatar_url,is_active,auth_id"),
         window.__SB.from("clients").select("id,name,email,pkg_amount,platforms,status,mb_id,sm_id,am_id,start_date,end_date,roas,total_spend,notes,cancel_reason,cancel_date,created_at,updated_at"),
         window.__SB.from("follow_ups").select("*").order("created_at",{ascending:false}),
         window.__SB.from("campaigns").select("*").order("week_start",{ascending:false}),
