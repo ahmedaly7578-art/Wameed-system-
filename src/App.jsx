@@ -1336,11 +1336,9 @@ function DailyReport({clients,currentUser}){
   const days=[...new Set(allRows.map(r=>r.stat_date))].sort();
   return(
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:6}}>
-        <div style={{color:C.text,fontSize:20,fontWeight:800}}>التقرير اليومي</div>
-        {isAdmin&&<button onClick={refresh} style={{padding:"8px 14px",background:`${C.purple}22`,border:`1px solid ${C.purple}44`,borderRadius:10,color:C.purple,fontFamily:"Cairo",fontSize:12,cursor:"pointer"}}>🔄 تحديث الحسابات من سناب</button>}
-      </div>
-      <div style={{color:C.textS,fontSize:13,marginBottom:18}}>أرقام سناب شات اليومية لكل عميل — بتتحدث تلقائياً الساعة 8:30 صباحاً بتوقيت القاهرة</div>
+      <TB title="التقرير اليومي 🗓️" sub="أرقام سناب شات اليومية لكل عميل، بتتحدث تلقائياً الساعة 8:30 صباحاً بتوقيت القاهرة"/>
+      <div className="wm-page" style={{padding:"0 32px 40px"}}>
+      {isAdmin&&<div style={{marginBottom:12}}><button onClick={refresh} style={{padding:"8px 14px",background:`${C.purple}22`,border:`1px solid ${C.purple}44`,borderRadius:10,color:C.purple,fontFamily:"Cairo",fontSize:12,cursor:"pointer"}}>🔄 تحديث الحسابات من سناب</button></div>}
       {msg&&<div style={{color:C.orange,fontSize:12,marginBottom:10}}>{msg}</div>}
       <Card s={{marginBottom:16}}>
         <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:12}}>
@@ -1407,6 +1405,7 @@ function DailyReport({clients,currentUser}){
         </div>
       )}
     </div>
+      </div>
   );
 }
 
