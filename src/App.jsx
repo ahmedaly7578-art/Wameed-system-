@@ -97,6 +97,14 @@ const INOTES=[
 
 const todayStr=()=>new Date().toISOString().split("T")[0];
 const fmtDate=(d)=>{if(!d)return"—";const dt=new Date(d);return`${dt.getDate()}/${dt.getMonth()+1}/${dt.getFullYear()}`};
+const WM_LATE_CUT="2026-11-26";
+const wmYMD=(d)=>{const x=d?new Date(d):new Date();if(isNaN(x))return null;return x.toISOString().slice(0,10);};
+const wmToday=()=>{const n=new Date();return new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString().slice(0,10);};
+const wmOff=(ymd)=>{const w=new Date(ymd+"T00:00:00Z").getUTCDay();return w===5||w===6;};
+const wmWorkdays=(from)=>{let a=new Date((from>WM_LATE_CUT?from:WM_LATE_CUT)+"T00:00:00Z"),b=new Date(wmToday()+"T00:00:00Z"),n=0;while(a<b){a=new Date(a.getTime()+86400000);if(!wmOff(a.toISOString().slice(0,10)))n++;}return n;};
+const wmFuLateDays=(lastDate)=>wmWorkdays(lastDate?(wmYMD(lastDate)||WM_LATE_CUT):WM_LATE_CUT);
+const wmDeadLate=(dd)=>{const y=wmYMD(dd);if(!y||y<WM_LATE_CUT)return false;let a=new Date(y+"T00:00:00Z");while(wmOff(a.toISOString().slice(0,10)))a=new Date(a.getTime()+86400000);const t=wmToday();return !wmOff(t)&&a.toISOString().slice(0,10)<=t;};
+const wmTaskLate=(t)=>t.status!=="done"&&wmDeadLate(t.due);
 const dl=(e)=>Math.ceil((new Date(e)-new Date())/86400000);
 const pct=(a,b)=>Math.min(100,Math.round((a/b)*100));
 const capC=(p)=>p>=90?C.red:p>=70?C.orange:C.green;
@@ -312,8 +320,8 @@ function Dashboard({clients,users,notifs,followups,tasks}){
   const rev=active.reduce((s,c)=>s+c.pkg,0);
   const avgR=active.length?(active.reduce((s,c)=>s+c.roas,0)/active.length).toFixed(1):0;
   const mbs=users.filter(u=>u.role==="media_buyer");
-  const late=active.filter(c=>{const f=followups.filter(x=>x.clientId===c.id).sort((a,b)=>b.date.localeCompare(a.date))[0];const d=f?Math.floor((new Date()-new Date(f.date))/86400000):999;return d>1;});
-  const lateTasks=tasks.filter(t=>new Date(t.due)<new Date()&&t.status!=="done");
+  const late=active.filter(c=>{const f=followups.filter(x=>x.clientId===c.id).sort((a,b)=>b.date.localeCompare(a.date))[0];return wmFuLateDays(f?f.date:null)>1;});
+  const lateTasks=tasks.filter(wmTaskLate);
   return(
     <div>
       <TB title="لوحة التحكم" sub="نظرة عامة على الأداء والفريق">
@@ -670,7 +678,7 @@ function Scorecard({clients,campaigns,tasks,users}){
     const avgR=myCams.length?(myCams.reduce((s,c)=>s+c.roas,0)/myCams.length):0;
     const myT=tasks.filter(t=>t.assignedTo===u.id);
     const doneT=myT.filter(t=>t.status==="done").length;
-    const lateT=myT.filter(t=>t.status==="late").length;
+    const lateT=myT.filter(wmTaskLate).length;
     const roasScore=Math.min(40,Math.round((avgR/5)*40));
     const clientScore=Math.min(30,myC.length*5);
     const taskScore=myT.length?Math.max(0,30-lateT*10):15;
@@ -1741,7 +1749,7 @@ function FollowUp({clients,users,followups,setFollowups,addNotif,currentUser}){
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:22}}>
           <StC label="متابَعين اليوم" value={filtered.filter(c=>getDays(c.id)===0).length} icon="✅" color={C.green}/>
           <StC label="أمس (تأخر يوم)" value={filtered.filter(c=>getDays(c.id)===1).length} icon="⏰" color={C.orange}/>
-          <StC label="متأخر أكثر من يوم" value={filtered.filter(c=>getDays(c.id)>1).length} icon="🚨" color={C.red}/>
+          <StC label="متأخر أكثر من يوم" value={filtered.filter(c=>wmFuLateDays(getLatest(c.id)?.date)>1).length} icon="🚨" color={C.red}/>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14}}>
           {filtered.map(c=>{
@@ -1912,7 +1920,7 @@ function CreativeTasks({tasks,setTasks,clients,users,currentUser}){
   const [addOpen,setAddOpen]=useState(false);const [edit,setEdit]=useState(null);
   const [filter,setFilter]=useState("all");const [filterDesigner,setFilterDesigner]=useState("all");
   const designers=users.filter(u=>u.role==="designer");
-  const isLate=(t)=>!t.done&&t.deadLine&&new Date(t.deadLine)<new Date();
+  const isLate=(t)=>!t.done&&t.deadLine&&wmDeadLate(t.deadLine);
   const filtered=tasks.filter(t=>{
     if(filter==="late"&&!isLate(t))return false;
     if(filter!=="all"&&filter!=="late"&&t.status!==filter)return false;
@@ -2058,7 +2066,7 @@ function AddMotionModal({open,onClose,onAdd,onSave,edit,clients,users}){
 function MotionTasks({tasks,setTasks,clients,users,currentUser}){
   const [addOpen,setAddOpen]=useState(false);const [edit,setEdit]=useState(null);
   const [filter,setFilter]=useState("all");const [filterOwner,setFilterOwner]=useState("all");
-  const isLate=(t)=>!t.done&&t.deadLine&&new Date(t.deadLine)<new Date();
+  const isLate=(t)=>!t.done&&t.deadLine&&wmDeadLate(t.deadLine);
   const filtered=tasks.filter(t=>{
     if(filter==="late"&&!isLate(t))return false;
     if(filter!=="all"&&filter!=="late"&&t.status!==filter)return false;
@@ -2229,14 +2237,14 @@ function MediaRenewals({tasks,setTasks,tabInfo,onRollover,rollingOver,clients,us
           ?<Card s={{textAlign:"center",padding:"50px"}}><div style={{fontSize:36,marginBottom:10}}>🔁</div><div style={{color:C.textS,fontSize:13}}>مفيش عملاء للتجديد {isTeam?"":"عندك"} الشهر ده</div></Card>
           :mine.slice().sort((a,b)=>(days(a)??999)-(days(b)??999)).map(t=>{
             const d=days(t);
-            const urgent=d!==null&&d<=3;
+            const urgent=d!==null&&d<=3;const rLate=d!==null&&d<0&&t.endDate&&wmWorkdays(wmYMD(t.endDate)||WM_LATE_CUT)>0;
             return(
               <Card key={t.id} s={{marginBottom:10,padding:"12px 16px"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
                   <div style={{minWidth:160}}>
                     <div style={{color:C.text,fontSize:13,fontWeight:700}}>{t.projectName}</div>
-                    <div style={{color:d!==null&&d<0?C.red:urgent?C.orange:C.textM,fontSize:11,fontWeight:d!==null&&d<0?700:400}}>
-                      {d===null?"—":d<0?`متأخر ${Math.abs(d)} يوم`:`باقي ${d} يوم`} · {fmtDate(t.endDate)}
+                    <div style={{color:rLate?C.red:urgent?C.orange:C.textM,fontSize:11,fontWeight:rLate?700:400}}>
+                      {d===null?"—":d<0?(rLate?`متأخر ${wmWorkdays(wmYMD(t.endDate))} يوم`:"—"):`باقي ${d} يوم`} · {fmtDate(t.endDate)}
                     </div>
                   </div>
                   <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}>
@@ -2586,7 +2594,7 @@ function Tasks({tasks,setTasks,clients,users,currentUser}){
   const [filter,setFilter]=useState("all");const [addOpen,setAddOpen]=useState(false);
   const [f,setF]=useState({title:"",assignedTo:"",clientId:"",due:"",priority:"medium",notes:""});
   const [err,setErr]=useState("");const sf=(k,v)=>setF(p=>({...p,[k]:v}));
-  const filtered=tasks.filter(t=>filter==="all"||t.status===filter);
+  const filtered=tasks.filter(t=>filter==="all"||(filter==="late"?wmTaskLate(t):t.status===filter));
   const TSC={pending:C.orange,done:C.green,late:C.red,inprogress:C.blue};
   const TSL={pending:"قيد الانتهاء",done:"مكتملة",late:"متأخرة",inprogress:"جارية"};
   const add=()=>{
@@ -2604,17 +2612,17 @@ function Tasks({tasks,setTasks,clients,users,currentUser}){
         {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginTop:14,marginBottom:0,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
         <div style={{display:"flex",gap:10,marginTop:14}}><Btn onClick={add} style={{flex:1,padding:13}}>✓ إضافة</Btn><button onClick={()=>setAddOpen(false)} style={{padding:"12px 20px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:12,color:C.textS,fontSize:14,fontFamily:"Cairo",cursor:"pointer"}}>إلغاء</button></div>
       </Mdl>
-      <TB title="المهام اليومية ✅" sub={`${tasks.length} إجمالي · ${tasks.filter(t=>t.status==="late").length} متأخرة`}>
+      <TB title="المهام اليومية ✅" sub={`${tasks.length} إجمالي · ${tasks.filter(wmTaskLate).length} متأخرة`}>
         <Btn onClick={()=>setAddOpen(true)}>+ إضافة مهمة</Btn>
       </TB>
       <div className="wm-page" style={{padding:"0 32px"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
-          {[["قيد الانتظار",tasks.filter(t=>t.status==="pending").length,C.orange,"⏳"],["جارية",tasks.filter(t=>t.status==="inprogress").length,C.blue,"🔄"],["مكتملة",tasks.filter(t=>t.status==="done").length,C.green,"✅"],["متأخرة",tasks.filter(t=>t.status==="late"||new Date(t.due)<new Date()&&t.status!=="done").length,C.red,"🚨"]].map(([l,v,co,ic])=><StC key={l} label={l} value={v} icon={ic} color={co}/>)}
+          {[["قيد الانتظار",tasks.filter(t=>t.status==="pending").length,C.orange,"⏳"],["جارية",tasks.filter(t=>t.status==="inprogress").length,C.blue,"🔄"],["مكتملة",tasks.filter(t=>t.status==="done").length,C.green,"✅"],["متأخرة",tasks.filter(wmTaskLate).length,C.red,"🚨"]].map(([l,v,co,ic])=><StC key={l} label={l} value={v} icon={ic} color={co}/>)}
         </div>
         <div style={{display:"flex",gap:8,marginBottom:16}}>{["all","pending","inprogress","done","late"].map(s=><button key={s} onClick={()=>setFilter(s)} style={{padding:"8px 14px",borderRadius:20,fontFamily:"Cairo",fontSize:12,cursor:"pointer",border:"1px solid",background:filter===s?`${C.pink}18`:C.bgCard,color:filter===s?C.pink:C.textS,borderColor:filter===s?`${C.pink}44`:C.border}}>{s==="all"?"الكل":TSL[s]}</button>)}</div>
         {filtered.map(t=>{
           const member=users.find(u=>u.id===t.assignedTo);const client=clients.find(c=>c.id===t.clientId);
-          const isLate=new Date(t.due)<new Date()&&t.status!=="done";
+          const isLate=wmTaskLate(t);
           const priC={high:C.red,medium:C.orange,low:C.green}[t.priority];
           return(<Card key={t.id} s={{marginBottom:10,padding:"13px 16px"}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -3752,8 +3760,8 @@ export default function App(){
     if (!user || user.type === "client") return;
     clients.filter(c => c.status === "active").forEach(c => {
       const last = followups.filter(f => f.clientId === c.id).sort((a,b) => (b.date||"").localeCompare(a.date||""))[0];
-      const diff = last ? Math.floor((new Date() - new Date(last.date)) / 86400000) : 999;
-      if (diff > 1 && !notifs.find(n => n.type === "late" && n.body?.includes(c.name))) {
+      const diff = last ? Math.floor((new Date() - new Date(last.date)) / 86400000) : 999; const lateD = wmFuLateDays(last ? last.date : null);
+      if (lateD > 1 && !notifs.find(n => n.type === "late" && n.body?.includes(c.name))) {
         addNotif({type:"late", title:"⚠️ تأخر فولو أب", body:`${c.name} — لم يُضَف فولو أب منذ ${diff===999?"البداية":`${diff} أيام`}`, userId:1});
       }
     });
