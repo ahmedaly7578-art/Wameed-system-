@@ -1443,6 +1443,12 @@ function DailyReport({clients,currentUser}){
           <Inp label="From" value={from} onChange={setFrom} type="date" mb={0}/>
           <Inp label="To" value={to} onChange={setTo} type="date" mb={0}/>
         </div>
+        {isAdmin&&cid&&<div style={{display:"flex",alignItems:"center",gap:10,marginTop:12,direction:"ltr",flexWrap:"wrap"}}>
+          <span style={{color:C.textS,fontSize:12}}>Company branding for this client:</span>
+          <select value={data?.client?.company||""} onChange={async(e)=>{const v=e.target.value;setMsg("Saving company...");try{const r=await wmAuthFetch(`${SNAP_DAILY_URL}?mode=set-company`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({clientId:cid,company:v||null})});setMsg(r.ok?"Company saved":"Could not save the company");if(r.ok)load();}catch(err){setMsg("Could not save the company");}}} style={{padding:"7px 12px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,fontFamily:"Cairo"}}>
+            <option value="">Not set (neutral report)</option>{COMPANIES.map(o=><option key={o.v} value={o.v}>{o.v==="wameed"?"Wameed":o.v==="alfaisal"?"Al-Faisal":o.v==="imdad"?"Imdad":o.l}</option>)}
+          </select>
+        </div>}
         <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap",direction:"ltr"}}><Btn onClick={()=>preset(1)}>Yesterday</Btn><Btn onClick={()=>preset(7)}>Last 7 days (weekly)</Btn><Btn onClick={()=>preset(30)}>Last 30 days (monthly)</Btn></div>
       </Card>
       {busy&&<div style={{color:C.textS,fontSize:13}}>Loading...</div>}
@@ -1457,7 +1463,7 @@ function DailyReport({clients,currentUser}){
                   <div style={{color:B?B.accent:"#9CA3AF",fontSize:11,letterSpacing:4,fontWeight:700}}>{B?B.en:"NO COMPANY SET"}</div>
                   <div style={{color:B?B.fg:"#F3F4F6",fontSize:24,fontWeight:900,marginTop:2}}>{data.client.name}</div>
                   {B?.draft&&<div style={{color:"#FDE68A",fontSize:11,marginTop:4}}>Draft: Imdad branding is not final yet</div>}
-                  {!B&&<div style={{color:"#FDE68A",fontSize:11,marginTop:4}}>No company is set for this client. Choose one on the client page.</div>}
+                  {!B&&<div style={{color:"#FDE68A",fontSize:11,marginTop:4}}>No company is set for this client. Choose one in the Company branding selector above.</div>}
                 </div>
               </div>
               <div style={{textAlign:"right"}}>
