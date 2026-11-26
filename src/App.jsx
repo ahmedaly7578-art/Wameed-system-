@@ -1048,13 +1048,6 @@ function ClientDetail({currentUser,c,users,onBack,notes,setNotes,satisfaction,ca
 
   return(
     <div>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
-        <span style={{color:C.textS,fontSize:12}}>الشركة:</span>
-        {currentUser?.role==="admin"
-          ? <select value={c.company||""} onChange={e=>setCompany(e.target.value)} style={{padding:"7px 12px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,fontFamily:"Cairo"}}><option value="">لم تُحدد</option>{COMPANIES.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select>
-          : <span style={{color:C.text,fontSize:13}}>{(COMPANIES.find(o=>o.v===c.company)||{}).l||"لم تُحدد"}</span>}
-        {coBusy&&<span style={{color:C.orange,fontSize:12}}>{coBusy}</span>}
-      </div>
       {/* Credentials Modal */}
       <Mdl open={credOpen} onClose={()=>setCredOpen(false)} title="🔑 بيانات دخول بوابة العميل" width={440}>
         <div style={{background:"rgba(123,111,224,0.08)",border:`1px solid ${C.purple}33`,borderRadius:12,padding:"12px 16px",marginBottom:16,fontSize:12,color:C.textS,lineHeight:1.6}}>
@@ -1081,6 +1074,13 @@ function ClientDetail({currentUser,c,users,onBack,notes,setNotes,satisfaction,ca
       </Mdl>
 
       <div style={{padding:"24px 32px 0"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <span style={{color:C.textS,fontSize:12}}>الشركة:</span>
+        {currentUser?.role==="admin"
+          ? <select value={c.company||""} onChange={e=>setCompany(e.target.value)} style={{padding:"7px 12px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,fontFamily:"Cairo"}}><option value="">لم تُحدد</option>{COMPANIES.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select>
+          : <span style={{color:C.text,fontSize:13}}>{(COMPANIES.find(o=>o.v===c.company)||{}).l||"لم تُحدد"}</span>}
+        {coBusy&&<span style={{color:C.orange,fontSize:12}}>{coBusy}</span>}
+      </div>
         <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",color:C.textS,cursor:"pointer",fontFamily:"Cairo",fontSize:13,marginBottom:14}}>← العملاء</button>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
           <div style={{display:"flex",alignItems:"center",gap:14}}>
