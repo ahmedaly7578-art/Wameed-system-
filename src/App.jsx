@@ -2469,7 +2469,7 @@ function ActiveCampaignsTab({clients,currentUser}){
   useEffect(()=>{load();},[]);
   const refresh=async()=>{
     setBusy("Fetching from Snapchat...");
-    try{for(const p of ["Snapchat","Meta"]){setBusy("Fetching from "+p+"...");const r=await wmAuthFetch(ACTIVE_CAMPAIGNS_URL+"?platform="+p,{method:"POST"});if(!r.ok)throw new Error("x");}setErr("");}catch(e){setErr("Refresh failed or timed out. Try again.");}
+    try{for(const p of ["Snapchat","Meta"]){setBusy("Fetching from "+p+"...");const r=await wmAuthFetch(ACTIVE_CAMPAIGNS_URL+"?platform="+p,{method:"POST"});if(!r.ok)throw new Error("x");const j=await r.json();if(p==="Meta"&&j.errors&&j.errors.no_valid_meta_token){setErr("The Meta connection expired. Reconnect it from the Businesses tab (Connect Meta account).");setBusy("");await load();return;}}setErr("");}catch(e){setErr("Refresh failed or timed out. Try again.");}
     setBusy("");await load();
   };
   const cname=(id)=>(clients||[]).find(c=>String(c.id)===String(id))?.name||"No client";
@@ -2488,6 +2488,7 @@ function ActiveCampaignsTab({clients,currentUser}){
       </div>
       <div style={{color:C.textM,fontSize:11,marginBottom:12,direction:"ltr"}}>Only campaigns that are active on the platform. Spend is the last 7 days, in each account's own currency. Updated daily{fetched?` · oldest data: ${new Date(fetched).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})} (Cairo)`:""}.</div>
       {err&&<div style={{color:C.red,fontSize:12,marginBottom:10}}>{err}</div>}
+      {["Snapchat","Meta"].map(pl=>{const t=all.filter(r=>r.platform===pl).reduce((m,r)=>r.fetched_at&&(!m||r.fetched_at>m)?r.fetched_at:m,null);if(rows===null||!t||Date.now()-new Date(t).getTime()<36*3600*1000)return null;return <div key={pl} style={{padding:"10px 14px",marginBottom:10,borderRadius:10,background:`${C.orange}15`,border:`1px solid ${C.orange}40`,color:C.orange,fontSize:12,direction:"ltr"}}>⚠ {pl} data is out of date (last updated {new Date(t).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})} Cairo).{pl==="Meta"?" The Meta connection probably expired: reconnect it from the Businesses tab (Connect Meta account).":" Check the Snapchat connection in the Businesses tab."}</div>;})}
       {rows===null?<Card s={{textAlign:"center",padding:"40px",color:C.textS}}>Loading...</Card>
       :shown.length===0?<Card s={{textAlign:"center",padding:"40px",color:C.textS}}>No active campaigns found.</Card>
       :<Card s={{padding:0,overflow:"hidden"}}><div style={{overflowX:"auto",direction:"ltr"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12,color:C.text}}>
