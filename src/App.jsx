@@ -1322,7 +1322,7 @@ const ratio=(a,b,k=1)=>(a===null||a===undefined||b===null||b===undefined||!(b>0)
 const num=(m,k)=>(m&&m[k]!==undefined&&m[k]!==null)?Number(m[k]):null;
 function sumKey(rows,k){let s=0,have=0;for(const r of rows){const v=num(r.metrics,k);if(v!==null){s+=v;have++;}}
   if(have===0)return {v:null,note:null};
-  if(have<rows.length)return {v:null,note:`جزئي ${have}/${rows.length}`};
+  if(have<rows.length)return {v:null,note:`${have}/${rows.length}`};
   return {v:s,note:null};}
 function metricsFor(rows){
   const g=(k)=>sumKey(rows,k);
@@ -1332,6 +1332,17 @@ function metricsFor(rows){
     ["الإنفاق",sp.v,2,sp.note],["مرات الظهور",im.v,0,im.note],["السحبات",sw.v,0,sw.note],["مشاهدات الفيديو",vv.v,0,vv.note],
     R(sw,im,100,2,"CTR %"),R(sp,im,1000,2,"eCPM"),R(sp,sw,1,3,"تكلفة السحبة"),
     ["المشتريات",pu.v,0,pu.note],["قيمة المشتريات",pv.v,2,pv.note],R(sp,pu,1,2,"تكلفة الشراء"),R(pv,sp,1,2,"ROAS"),
+  ];
+}
+function metricGroups(rows){
+  const g=(k)=>sumKey(rows,k);
+  const sp=g("spend"),im=g("impressions"),sw=g("swipes"),vv=g("video_views"),st=g("screen_time_millis"),ac=g("conversion_add_cart"),pg=g("conversion_page_views"),pu=g("conversion_purchases"),pv=g("conversion_purchases_value");
+  const V=(l,x,d=0,suf="")=>({l,v:x.v,d,n:x.note,suf});
+  const R=(l,x,y,k,d,suf="")=>{const n=x.note||y.note;return {l,v:n?null:ratio(x.v,y.v,k),d,n,suf};};
+  return [
+    {t:"Delivery",items:[V("Spend",sp,2),V("Impressions",im),V("Swipes",sw),V("Video views",vv),{l:"Screen time (hours)",v:st.v===null?null:st.v/3600000,d:1,n:st.note,suf:""}]},
+    {t:"Efficiency",items:[R("CTR (swipe rate)",sw,im,100,2,"%"),R("eCPM",sp,im,1000,2),R("Cost per swipe",sp,sw,1,3),R("Video view rate",vv,im,100,2,"%")]},
+    {t:"Conversions",items:[V("Page views",pg),V("Add to cart",ac),V("Purchases",pu),V("Revenue",pv,2),R("ROAS",pv,sp,1,2,"x"),R("Cost per purchase",sp,pu,1,2),R("Cost per add to cart",sp,ac,1,2),R("Avg order value",pv,pu,1,2),R("Purchase rate (per swipe)",pu,sw,100,2,"%")]},
   ];
 }
 function DailyReport({clients,currentUser}){
@@ -1349,143 +1360,165 @@ function DailyReport({clients,currentUser}){
     try{
       const r=await wmAuthFetch(`${SNAP_DAILY_URL}?mode=report&clientId=${cid}&from=${from}&to=${to}`);
       const j=await r.json();
-      if(!r.ok)setErr(r.status===403?"ليس لديك صلاحية على هذا العميل":"تعذر تحميل التقرير");else setData(j);
-    }catch(e){setErr("تعذر تحميل التقرير");}
+      if(!r.ok)setErr(r.status===403?"You do not have access to this client":"Could not load the report");else setData(j);
+    }catch(e){setErr("Could not load the report");}
     setBusy(false);
   };
   useEffect(()=>{load();},[cid,from,to]);
   const refresh=async()=>{
-    setMsg("جاري التحديث...");
+    setMsg("Refreshing...");
     try{const r=await wmAuthFetch(`${SNAP_DAILY_URL}?mode=refresh-accounts`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});const j=await r.json();
-      setMsg(r.ok?`تم: ${j.accounts_seen} حساب، ${j.new_accounts} جديد${j.errors?.length?` — أخطاء: ${j.errors.length}`:""}`:"تعذر التحديث");}catch(e){setMsg("تعذر التحديث");}
+      setMsg(r.ok?`Done: ${j.accounts_seen} accounts, ${j.new_accounts} new${j.errors?.length?`, ${j.errors.length} errors`:""}`:"Refresh failed");}catch(e){setMsg("Refresh failed");}
   };
   const exportPng=async()=>{
-    if(!ref.current)return;setMsg("جاري التصدير...");
+    if(!ref.current)return;setMsg("Exporting...");
     try{
       const {default:h2c}=await import(/* @vite-ignore */ "https://esm.sh/html2canvas@1.4.1");
       const cv=await h2c(ref.current,{backgroundColor:null,scale:2});
-      const a=document.createElement("a");a.download=`daily-report-${data?.client?.name||"client"}-${to}.png`;a.href=cv.toDataURL("image/png");a.click();setMsg("");
-    }catch(e){setMsg("تعذر التصدير");}
+      const a=document.createElement("a");a.download=`report-${data?.client?.name||"client"}-${to}.png`;a.href=cv.toDataURL("image/png");a.click();setMsg("");
+    }catch(e){setMsg("Export failed");}
   };
+  const company=data?.client?.company||null;
+  const B=company?BRANDS[company]:null;
+  const spanDays=Math.round((new Date(to)-new Date(from))/86400000)+1;
+  const periodLabel=spanDays>=28?"Monthly report":spanDays>=6?"Weekly report":"Daily report";
+  const preset=(n)=>{setTo(iso(new Date(Date.now()-86400000)));setFrom(iso(new Date(Date.now()-n*86400000)));};
+  const accounts=data?.accounts||[];
+  const byCur={};
+  accounts.forEach(a=>{const c=a.currency||"Unknown currency";(byCur[c]=byCur[c]||[]).push(...a.rows);});
+  const allRows=accounts.flatMap(a=>a.rows);
+  const fetched=allRows.map(r=>r.fetched_at).filter(Boolean).sort().pop();
+  const anyPrelim=allRows.some(r=>!r.final);
+  const days=[...new Set(allRows.map(r=>r.stat_date))].sort();
+  const campaignsFor=(rows)=>{const m={};rows.forEach(r=>{const k=r.campaign_id||r.campaign_name;(m[k]=m[k]||{name:r.campaign_name||r.campaign_id,rows:[]}).rows.push(r);});
+    return Object.values(m).map(c=>({name:c.name,days:new Set(c.rows.map(r=>r.stat_date)).size,m:metricGroups(c.rows).flatMap(g=>g.items).reduce((o,i)=>(o[i.l]=i,o),{})})).sort((a,b)=>(b.m["Spend"].v||0)-(a.m["Spend"].v||0));};
+  const cell=(i,d)=>i?fmtN(i.v,i.d)+(i.v!==null&&i.suf?i.suf:""):"—";
   const exportPptx=async()=>{
-    if(!data)return;setMsg("جاري تجهيز العرض...");
+    if(!data)return;setMsg("Preparing PowerPoint...");
     try{
       const {default:Pptx}=await import(/* @vite-ignore */ "https://esm.sh/pptxgenjs@3.12.0");
       const pp=new Pptx();pp.layout="LAYOUT_WIDE";
       const hex=(x,d)=>{const m=/#([0-9A-Fa-f]{6})/.exec(x||"");return m?m[1].toUpperCase():d;};
       const Bk=data.client.company?BRANDS[data.client.company]:null;
       const bg=hex(Bk?.bg,"1F2937"),ac=hex(Bk?.accent,"9CA3AF"),fg=hex(Bk?.fg,"F3F4F6");
-      const nm=data.client.name;const per=`${from} → ${to}`;
+      const nm=data.client.name;const per=`${from} to ${to}`;
       const s1=pp.addSlide();s1.background={color:bg};
       if(Bk?.logo)s1.addImage({data:Bk.logo,x:0.6,y:0.5,w:2.2,h:1.4,sizing:{type:"contain",w:2.2,h:1.4}});
-      s1.addText(nm,{x:0.6,y:2.6,w:12,h:1,fontSize:40,bold:true,color:fg,rtlMode:true,align:"right"});
-      s1.addText(periodLabel+" · "+per,{x:0.6,y:3.7,w:12,h:0.6,fontSize:20,color:ac,align:"right",rtlMode:true});
+      s1.addText(nm,{x:0.6,y:2.6,w:12,h:1,fontSize:40,bold:true,color:fg});
+      s1.addText(periodLabel+" | "+per,{x:0.6,y:3.7,w:12,h:0.6,fontSize:20,color:ac});
       Object.entries(byCur).forEach(([cur,rows])=>{
-        const sl=pp.addSlide();sl.background={color:bg};
-        sl.addText("إجمالي بعملة "+cur,{x:0.6,y:0.4,w:12,h:0.7,fontSize:26,bold:true,color:ac,align:"right",rtlMode:true});
-        metricsFor(rows).forEach(([l,v,d],i)=>{const x=0.6+(i%4)*3.1,y=1.5+Math.floor(i/4)*1.9;
-          sl.addShape(pp.ShapeType.roundRect,{x,y,w:2.9,h:1.6,fill:{color:ac,transparency:85},line:{color:ac,width:1}});
-          sl.addText(String(l),{x,y:y+0.1,w:2.9,h:0.5,fontSize:14,color:fg,align:"center",rtlMode:true});
-          sl.addText(fmtN(v,d),{x,y:y+0.7,w:2.9,h:0.7,fontSize:26,bold:true,color:fg,align:"center"});});
+        metricGroups(rows).forEach(gr=>{
+          const sl=pp.addSlide();sl.background={color:bg};
+          sl.addText(gr.t+" ("+cur+")",{x:0.6,y:0.4,w:12,h:0.7,fontSize:26,bold:true,color:ac});
+          gr.items.forEach((it,i)=>{const x=0.6+(i%4)*3.1,y=1.5+Math.floor(i/4)*1.9;
+            sl.addShape(pp.ShapeType.roundRect,{x,y,w:2.9,h:1.6,fill:{color:ac,transparency:85},line:{color:ac,width:1}});
+            sl.addText(it.l,{x,y:y+0.1,w:2.9,h:0.5,fontSize:13,color:fg,align:"center"});
+            sl.addText(cell(it),{x,y:y+0.7,w:2.9,h:0.7,fontSize:24,bold:true,color:fg,align:"center"});});
+        });
+        const cs=campaignsFor(rows).slice(0,12);
+        if(cs.length){const sl=pp.addSlide();sl.background={color:bg};
+          sl.addText("Campaigns ("+cur+")",{x:0.6,y:0.3,w:12,h:0.6,fontSize:22,bold:true,color:ac});
+          const cols=["Spend","Impressions","Swipes","CTR (swipe rate)","Purchases","Revenue","ROAS"];
+          const hd=["Campaign",...cols].map(t=>({text:t,options:{bold:true,color:bg,fill:{color:ac}}}));
+          const body=cs.map(c=>[c.name,...cols.map(k=>cell(c.m[k]))].map(t=>({text:String(t),options:{color:fg}})));
+          sl.addTable([hd,...body],{x:0.6,y:1.1,w:12,fontSize:10,border:{type:"solid",color:ac,pt:0.5}});}
       });
-      const rowsAll=allRows.slice().sort((x,y)=>x.stat_date<y.stat_date?1:-1).slice(0,14);
-      if(rowsAll.length){const sl=pp.addSlide();sl.background={color:bg};
-        sl.addText("تفاصيل الحملات (سناب)",{x:0.6,y:0.3,w:12,h:0.6,fontSize:22,bold:true,color:ac,align:"right",rtlMode:true});
-        const hd=["التاريخ","الحملة","الإنفاق","الظهور","السحبات","الحالة"].map(t=>({text:t,options:{bold:true,color:bg,fill:{color:ac}}}));
-        const body=rowsAll.map(r=>[r.stat_date,String(r.campaign_name||r.campaign_id||""),fmtN(num(r.metrics,"spend"),2),fmtN(num(r.metrics,"impressions")),fmtN(num(r.metrics,"swipes")),r.final?"نهائي":"أولي"].map(t=>({text:String(t),options:{color:fg}})));
-        sl.addTable([hd,...body],{x:0.6,y:1.1,w:12,fontSize:11,border:{type:"solid",color:ac,pt:0.5}});}
       const sp=pp.addSlide();sp.background={color:bg};
-      sp.addText("حالة ربط المنصات",{x:0.6,y:0.4,w:12,h:0.7,fontSize:26,bold:true,color:ac,align:"right",rtlMode:true});
-      [["Snapchat",accounts.length?"متصل: أرقام حقيقية من سناب":"غير مربوط بحساب"],["Meta","غير متصل بالتقرير حاليًا"],["TikTok","غير متصل بالتقرير حاليًا"]].forEach(([a,b],i)=>sp.addText(a+": "+b,{x:0.6,y:1.5+i*0.9,w:12,h:0.7,fontSize:20,color:fg,align:"right",rtlMode:true}));
+      sp.addText("Platform connection status",{x:0.6,y:0.4,w:12,h:0.7,fontSize:26,bold:true,color:ac});
+      [["Snapchat",accounts.length?"Connected: real numbers from Snapchat":"No account linked"],["Meta","Not connected to reports yet"],["TikTok","Not connected to reports yet"]].forEach(([a,b],i)=>sp.addText(a+": "+b,{x:0.6,y:1.5+i*0.9,w:12,h:0.7,fontSize:20,color:fg}));
       await pp.writeFile({fileName:`report-${nm}-${to}.pptx`});setMsg("");
-    }catch(e){setMsg("تعذر تصدير PowerPoint");}
+    }catch(e){setMsg("PowerPoint export failed");}
   };
-  const company=data?.client?.company||null;
-  const B=company?BRANDS[company]:null;
-  const spanDays=Math.round((new Date(to)-new Date(from))/86400000)+1;
-  const periodLabel=spanDays>=28?"تقرير شهري":spanDays>=6?"تقرير أسبوعي":"تقرير يومي";
-  const preset=(n)=>{setTo(iso(new Date(Date.now()-86400000)));setFrom(iso(new Date(Date.now()-n*86400000)));};
-  const accounts=data?.accounts||[];
-  const byCur={};
-  accounts.forEach(a=>{const cur=a.currency||"—";(byCur[cur]=byCur[cur]||[]).push(...a.rows.map(r=>({...r,cur})));});
-  const allRows=accounts.flatMap(a=>a.rows);
-  const fetched=allRows.map(r=>r.fetched_at).filter(Boolean).sort().pop();
-  const anyPrelim=allRows.some(r=>!r.final);
-  const days=[...new Set(allRows.map(r=>r.stat_date))].sort();
+  const th={padding:"8px 10px",textAlign:"left",fontSize:10,letterSpacing:0.6,textTransform:"uppercase",color:"rgba(255,255,255,0.6)",whiteSpace:"nowrap",borderBottom:`1px solid ${C.border}`};
+  const td={padding:"8px 10px",textAlign:"left",fontSize:12,whiteSpace:"nowrap",borderBottom:"1px solid rgba(255,255,255,0.04)"};
   return(
     <div>
-      <TB title="التقرير اليومي 🗓️" sub="أرقام سناب شات اليومية لكل عميل، بتتحدث تلقائياً الساعة 8:30 صباحاً بتوقيت القاهرة"/>
+      <TB title="Client Reports 🗓️" sub="Daily Snapchat numbers per client, refreshed automatically at 8:30 AM Cairo time. Use the period buttons for weekly and monthly views."/>
       <div className="wm-page" style={{padding:"0 32px 40px"}}>
-      {isAdmin&&<div style={{marginBottom:12}}><button onClick={refresh} style={{padding:"8px 14px",background:`${C.purple}22`,border:`1px solid ${C.purple}44`,borderRadius:10,color:C.purple,fontFamily:"Cairo",fontSize:12,cursor:"pointer"}}>🔄 تحديث الحسابات من سناب</button></div>}
+      {isAdmin&&<div style={{marginBottom:12}}><button onClick={refresh} style={{padding:"8px 14px",background:`${C.purple}22`,border:`1px solid ${C.purple}44`,borderRadius:10,color:C.purple,fontFamily:"Cairo",fontSize:12,cursor:"pointer"}}>🔄 Refresh accounts from Snapchat</button></div>}
       {msg&&<div style={{color:C.orange,fontSize:12,marginBottom:10}}>{msg}</div>}
       <Card s={{marginBottom:16}}>
-        <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:12}}>
-          <Sel label="العميل" value={cid} onChange={setCid} opts={mine.map(c=>({v:c.id,l:c.name}))} ph="اختر عميل" mb={0}/>
-          <Inp label="من" value={from} onChange={setFrom} type="date" mb={0}/>
-          <Inp label="إلى" value={to} onChange={setTo} type="date" mb={0}/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12,direction:"ltr"}}>
+          <Sel label="Client" value={cid} onChange={setCid} opts={mine.map(c=>({v:c.id,l:c.name}))} ph="Select a client" mb={0}/>
+          <Inp label="From" value={from} onChange={setFrom} type="date" mb={0}/>
+          <Inp label="To" value={to} onChange={setTo} type="date" mb={0}/>
         </div>
-        <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}><Btn onClick={()=>preset(1)}>أمس</Btn><Btn onClick={()=>preset(7)}>آخر 7 أيام (أسبوعي)</Btn><Btn onClick={()=>preset(30)}>آخر 30 يوم (شهري)</Btn></div>
+        <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap",direction:"ltr"}}><Btn onClick={()=>preset(1)}>Yesterday</Btn><Btn onClick={()=>preset(7)}>Last 7 days (weekly)</Btn><Btn onClick={()=>preset(30)}>Last 30 days (monthly)</Btn></div>
       </Card>
-      {busy&&<div style={{color:C.textS,fontSize:13}}>جاري التحميل...</div>}
+      {busy&&<div style={{color:C.textS,fontSize:13}}>Loading...</div>}
       {err&&<div style={{color:C.red,fontSize:13}}>{err}</div>}
       {data&&(
         <div>
-          <div ref={ref} style={{borderRadius:18,overflow:"hidden",border:`1px solid ${C.border}`,background:"#0D1526"}}>
-            <div style={{background:B?B.bg:"#1F2937",padding:"20px 24px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{display:"flex",alignItems:"center",gap:14}}>
-                {B?.logo&&<img src={B.logo} alt="" style={{height:54,width:"auto"}}/>}
+          <div ref={ref} style={{borderRadius:16,overflow:"hidden",border:`1px solid ${C.border}`,background:C.bgCard,direction:"ltr",textAlign:"left"}}>
+            <div style={{background:B?B.bg:"#1F2937",padding:"22px 26px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:16}}>
+                {B?.logo&&<img src={B.logo} alt="" style={{height:56,width:"auto"}}/>}
                 <div>
-                <div style={{color:B?B.fg:"#F3F4F6",fontSize:22,fontWeight:900,}}>{B?B.name:"—"} <span style={{fontSize:12,letterSpacing:4,color:B?B.accent:"#9CA3AF",fontWeight:700}}>{B?B.en:"NO COMPANY SET"}</span></div>
-                {B?.draft&&<div style={{color:"#FDE68A",fontSize:11,marginTop:4}}>مسودة — هوية إمداد لسه مش معتمدة</div>}
-                {!B&&<div style={{color:"#FDE68A",fontSize:11,marginTop:4}}>الشركة لم تُحدد لهذا العميل — اختارها من صفحة العميل</div>}
+                  <div style={{color:B?B.accent:"#9CA3AF",fontSize:11,letterSpacing:4,fontWeight:700}}>{B?B.en:"NO COMPANY SET"}</div>
+                  <div style={{color:B?B.fg:"#F3F4F6",fontSize:24,fontWeight:900,marginTop:2}}>{data.client.name}</div>
+                  {B?.draft&&<div style={{color:"#FDE68A",fontSize:11,marginTop:4}}>Draft: Imdad branding is not final yet</div>}
+                  {!B&&<div style={{color:"#FDE68A",fontSize:11,marginTop:4}}>No company is set for this client. Choose one on the client page.</div>}
                 </div>
               </div>
-              <div style={{textAlign:"left"}}>
-                <div style={{color:B?B.fg:"#F3F4F6",fontSize:15,fontWeight:800}}>{data.client.name} · {periodLabel}</div>
-                <div style={{color:B?B.accent:"#9CA3AF",fontSize:11,marginTop:2}}>{days.length?`من ${days[0]} إلى ${days[days.length-1]}`:`من ${from} إلى ${to}`}</div>
+              <div style={{textAlign:"right"}}>
+                <div style={{color:B?B.fg:"#F3F4F6",fontSize:16,fontWeight:800}}>{periodLabel}</div>
+                <div style={{color:B?B.accent:"#9CA3AF",fontSize:12,marginTop:2}}>{days.length?`${days[0]} to ${days[days.length-1]}`:`${from} to ${to}`}</div>
               </div>
             </div>
-            <div style={{padding:"18px 24px"}}>
-              {accounts.length===0&&<div style={{color:C.textS,fontSize:13}}>لا توجد حسابات سناب مربوطة بهذا العميل بعد (اربطها من الحملات ← الحسابات).</div>}
-              {accounts.length>0&&allRows.length===0&&<div style={{color:C.textS,fontSize:13}}>لا توجد أرقام محفوظة لهذه الفترة بعد.</div>}
-              {Object.entries(byCur).map(([cur,rows])=>(
-                <div key={cur} style={{marginBottom:18}}>
-                  <div style={{color:C.text,fontSize:13,fontWeight:800,marginBottom:8}}>إجمالي بعملة {cur}</div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8}}>
-                    {metricsFor(rows).map(([l,v,d,n])=>(
-                      <div key={l} style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px"}}>
-                        <div style={{color:C.textS,fontSize:11}}>{l}</div>
-                        <div style={{color:C.text,fontSize:16,fontWeight:800,direction:"ltr",textAlign:"right"}}>{fmtN(v,d)}</div>{n&&<div style={{color:C.orange,fontSize:10,marginTop:2}}>{n}</div>}
-                      </div>))}
-                  </div>
-                </div>
-              ))}
+            <div style={{padding:"20px 26px"}}>
+              {accounts.length===0&&<div style={{color:C.textS,fontSize:13}}>No Snapchat accounts are linked to this client yet (link them in Campaigns, Businesses).</div>}
+              {accounts.length>0&&allRows.length===0&&<div style={{color:C.textS,fontSize:13}}>No saved numbers for this period yet.</div>}
+              {Object.entries(byCur).map(([cur,rows])=>{const cs=campaignsFor(rows);return(
+                <div key={cur} style={{marginBottom:26}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}><div style={{color:C.text,fontSize:15,fontWeight:800}}>Totals in {cur}</div><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:"rgba(255,255,255,0.07)",color:C.textS}}>{cs.length} campaigns</span></div>
+                  {metricGroups(rows).map(gr=>(
+                    <div key={gr.t} style={{marginBottom:14}}>
+                      <div style={{color:B?B.accent:C.textS,fontSize:11,letterSpacing:1.5,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>{gr.t}</div>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
+                        {gr.items.map(i=>(
+                          <div key={i.l} style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px"}}>
+                            <div style={{color:C.textS,fontSize:11}}>{i.l}</div>
+                            <div style={{color:C.text,fontSize:18,fontWeight:800,marginTop:2}}>{cell(i)}</div>
+                            {i.n&&<div style={{color:C.orange,fontSize:10,marginTop:2}}>partial {i.n}</div>}
+                          </div>))}
+                      </div>
+                    </div>
+                  ))}
+                  {cs.length>0&&<div style={{marginTop:16}}>
+                    <div style={{color:B?B.accent:C.textS,fontSize:11,letterSpacing:1.5,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>By campaign (period total)</div>
+                    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}>
+                      <thead><tr>{["Campaign","Days","Spend","Impressions","Swipes","CTR","Video views","Add to cart","Purchases","Revenue","ROAS","Cost / purchase"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+                      <tbody>{cs.map((c,i)=><tr key={i} style={{color:C.text}}>
+                        <td style={{...td,maxWidth:260,overflow:"hidden",textOverflow:"ellipsis"}}>{c.name}</td><td style={td}>{c.days}</td>
+                        {["Spend","Impressions","Swipes","CTR (swipe rate)","Video views","Add to cart","Purchases","Revenue","ROAS","Cost per purchase"].map(k=><td key={k} style={td}>{cell(c.m[k])}</td>)}
+                      </tr>)}</tbody>
+                    </table></div>
+                  </div>}
+                </div>);})}
               {accounts.filter(a=>a.rows.length).map(a=>(
-                <div key={a.id} style={{marginBottom:14}}>
-                  <div style={{color:"rgba(255,255,255,0.75)",fontSize:12,marginBottom:6}}>{a.name} · {a.currency||"—"} · {a.timezone||"—"}</div>
-                  <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                    <thead><tr style={{color:"rgba(255,255,255,0.7)",textAlign:"right"}}>{["التاريخ","الحملة","الإنفاق","الظهور","السحبات","CTR %","المشتريات","قيمة المشتريات","ROAS","الحالة"].map(h=><th key={h} style={{padding:"6px 8px",borderBottom:`1px solid ${C.border}`,fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+                <div key={a.id} style={{marginBottom:16}}>
+                  <div style={{color:B?B.accent:C.textS,fontSize:11,letterSpacing:1.5,textTransform:"uppercase",fontWeight:700,marginBottom:6}}>Daily detail: {a.name} ({a.currency||"unknown currency"}, {a.timezone||"unknown timezone"})</div>
+                  <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead><tr>{["Date","Campaign","Spend","Impressions","Swipes","CTR","Video views","Add to cart","Purchases","Revenue","ROAS","Status"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
                     <tbody>{a.rows.slice().sort((x,y)=>x.stat_date<y.stat_date?1:-1).map((r,i)=>{
-                      const sp=num(r.metrics,"spend"),im=num(r.metrics,"impressions"),sw=num(r.metrics,"swipes"),pu=num(r.metrics,"conversion_purchases"),pv=num(r.metrics,"conversion_purchases_value");
-                      const td={padding:"6px 8px",direction:"ltr",textAlign:"right"};
+                      const sp=num(r.metrics,"spend"),im=num(r.metrics,"impressions"),sw=num(r.metrics,"swipes"),vv=num(r.metrics,"video_views"),ac=num(r.metrics,"conversion_add_cart"),pu=num(r.metrics,"conversion_purchases"),pv=num(r.metrics,"conversion_purchases_value");
                       return <tr key={i} style={{color:C.text}}>
-                        <td style={td}>{r.stat_date}</td><td style={{padding:"6px 8px"}}>{r.campaign_name||r.campaign_id}</td>
-                        <td style={td}>{fmtN(sp,2)}</td><td style={td}>{fmtN(im)}</td><td style={td}>{fmtN(sw)}</td>
-                        <td style={td}>{fmtN(ratio(sw,im,100),2)}</td>
-                        <td style={td}>{fmtN(pu)}</td><td style={td}>{fmtN(pv,2)}</td><td style={td}>{fmtN(ratio(pv,sp),2)}</td>
-                        <td style={{padding:"6px 8px",color:r.final?C.green:C.orange,whiteSpace:"nowrap"}}>{r.final?"نهائي":"أولي"}</td></tr>;})}</tbody>
+                        <td style={td}>{r.stat_date}</td><td style={{...td,maxWidth:240,overflow:"hidden",textOverflow:"ellipsis"}}>{r.campaign_name||r.campaign_id}</td>
+                        <td style={td}>{fmtN(sp,2)}</td><td style={td}>{fmtN(im)}</td><td style={td}>{fmtN(sw)}</td><td style={td}>{ratio(sw,im,100)===null?"—":fmtN(ratio(sw,im,100),2)+"%"}</td>
+                        <td style={td}>{fmtN(vv)}</td><td style={td}>{fmtN(ac)}</td><td style={td}>{fmtN(pu)}</td><td style={td}>{fmtN(pv,2)}</td><td style={td}>{fmtN(ratio(pv,sp),2)}</td>
+                        <td style={{...td,color:r.final?C.green:C.orange}}>{r.final?"Final":"Preliminary"}</td></tr>;})}</tbody>
                   </table></div>
                 </div>
               ))}
-              <div style={{color:"rgba(255,255,255,0.78)",fontSize:13,lineHeight:1.8,marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
-                {anyPrelim?"⚠️ أرقام أولية: سناب بتثبّت الأرقام بعد 48 ساعة من نهاية اليوم. ":""}
-                آخر جلب: {fetched?new Date(fetched).toLocaleString("ar-EG",{timeZone:"Africa/Cairo"}):"—"} (توقيت القاهرة). الإجماليات منفصلة لكل عملة. "—" يعني الرقم غير متاح من سناب، و"جزئي" يعني بعض الحملات ناقصة فلا يتم عرض إجمالي كامل.
+              <div style={{color:"rgba(255,255,255,0.7)",fontSize:12,lineHeight:1.8,marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+                {anyPrelim?"Preliminary numbers: Snapchat finalizes figures about 48 hours after the end of each day. ":""}
+                Last fetched: {fetched?new Date(fetched).toLocaleString("en-GB",{timeZone:"Africa/Cairo"}):"—"} (Cairo time). Totals are kept separate per currency. A dash means Snapchat did not return that number. "Partial" means some campaigns are missing that number, so no total is shown.
               </div>
             </div>
           </div>
-          <div style={{marginTop:12,display:"flex",gap:8,flexWrap:"wrap"}}><Btn onClick={exportPng}>⬇️ تصدير كصورة</Btn><Btn onClick={exportPptx}>⬇️ تصدير PowerPoint</Btn></div>
-          <div style={{marginTop:14,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
-            {[["Meta","غير متصل بتقرير العميل حاليًا. الأرقام هتظهر هنا بعد ربط الحساب وتفعيل المزامنة."],["TikTok","غير متصل. لسه مفيش ربط فعلي، ومفيش أرقام معروضة."]].map(([n,t])=>(
+          <div style={{marginTop:12,display:"flex",gap:8,flexWrap:"wrap",direction:"ltr"}}><Btn onClick={exportPng}>⬇️ Export image</Btn><Btn onClick={exportPptx}>⬇️ Export PowerPoint</Btn></div>
+          <div style={{marginTop:14,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10,direction:"ltr",textAlign:"left"}}>
+            {[["Meta","Not connected to client reports yet. Numbers will appear here once the account is linked and syncing."],["TikTok","Not connected. No live integration yet, so no numbers are shown."]].map(([n,t])=>(
               <div key={n} style={{background:"rgba(255,255,255,0.03)",border:`1px dashed ${C.border}`,borderRadius:10,padding:"12px 14px"}}><div style={{color:C.text,fontWeight:800,fontSize:13}}>{n}</div><div style={{color:C.textS,fontSize:12,marginTop:4}}>{t}</div></div>))}
           </div>
         </div>
@@ -1603,20 +1636,20 @@ function Capacity({clients,users}){
   const avgP=mbs.length?Math.round(mbs.reduce((s,m)=>s+pct(clients.filter(c=>c.mb===m.id&&c.status==="active").length,MAX.media_buyer),0)/mbs.length):0;
   return(
     <div>
-      <TB title="Capacity الفريق ⚡" sub="توزيع العملاء وحمل كل عضو"/>
+      <TB title="Team Capacity ⚡" sub="Client distribution and workload per media buyer"/>
       <div className="wm-page" style={{padding:"0 32px"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:22}}>
           <StC label="Media Buyers" value={mbs.length} icon="📊" color={C.purple}/>
-          <StC label="متوسط الـ Capacity" value={`${avgP}%`} icon="⚡" color={C.orange}/>
-          <StC label="متاح لعملاء جدد" value={mbs.filter(m=>pct(clients.filter(c=>c.mb===m.id&&c.status==="active").length,10)<90).length} icon="✅" color={C.green}/>
+          <StC label="Average capacity" value={`${avgP}%`} icon="⚡" color={C.orange}/>
+          <StC label="Open for new clients" value={mbs.filter(m=>pct(clients.filter(c=>c.mb===m.id&&c.status==="active").length,10)<90).length} icon="✅" color={C.green}/>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:22}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(270px,1fr))",gap:14,marginBottom:22,direction:"ltr",textAlign:"left"}}>
           {mbs.map(m=>{const ac=clients.filter(c=>c.mb===m.id&&c.status==="active").length;const hold=clients.filter(c=>c.mb===m.id&&c.status==="hold").length;const p=pct(ac,10);const cp=capC(p);const myC=clients.filter(c=>c.mb===m.id&&c.status==="active");
             return(<Card key={m.id}>
-              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}><Av text={m.avatar} img={m.avatarUrl} color={RC.media_buyer} size={44}/><div style={{flex:1}}><div style={{color:C.text,fontSize:14,fontWeight:700}}>{m.name}</div><Bdg label="Media Buyer" color={RC.media_buyer}/></div><div style={{textAlign:"center"}}><div style={{color:cp,fontSize:22,fontWeight:800,lineHeight:1}}>{p}%</div><div style={{color:C.textM,fontSize:10}}>ممتلئ</div></div></div>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}><Av text={m.avatar} img={m.avatarUrl} color={RC.media_buyer} size={44}/><div style={{flex:1,minWidth:0}}><div style={{color:C.text,fontSize:14,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={m.name}>{m.name}</div><Bdg label="Media Buyer" color={RC.media_buyer}/></div><div style={{textAlign:"center",flexShrink:0,minWidth:52}}><div style={{color:cp,fontSize:22,fontWeight:800,lineHeight:1}}>{p}%</div><div style={{color:C.textM,fontSize:10}}>full</div></div></div>
               <div style={{height:10,background:"rgba(255,255,255,0.07)",borderRadius:5,overflow:"hidden",marginBottom:12}}><div style={{height:"100%",width:`${p}%`,background:cp,borderRadius:5}}/></div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:8,marginBottom:12}}>{[["نشط",ac,C.green],["هولد",hold,C.orange],["الحد",10,C.textS]].map(([l,v,co])=><div key={l} style={{textAlign:"center",padding:"8px 4px",background:"rgba(255,255,255,0.03)",borderRadius:8}}><div style={{color:co,fontSize:18,fontWeight:800}}>{v}</div><div style={{color:C.textM,fontSize:10}}>{l}</div></div>)}</div>
-              <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10}}><div style={{color:C.textM,fontSize:11,marginBottom:6}}>العملاء الحاليين</div>{myC.slice(0,3).map(c=><div key={c.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:`1px solid rgba(255,255,255,0.04)`}}><span style={{color:C.textS,fontSize:11}}>{c.name}</span><span style={{color:c.roas>=3?C.green:C.orange,fontSize:11,fontWeight:700}}>ROAS {c.roas}</span></div>)}{myC.length===0&&<div style={{color:C.textM,fontSize:11}}>لا يوجد عملاء</div>}</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>{[["Active",ac,C.green],["On hold",hold,C.orange],["Limit",10,C.textS]].map(([l,v,co])=><div key={l} style={{textAlign:"center",padding:"8px 4px",background:"rgba(255,255,255,0.03)",borderRadius:8}}><div style={{color:co,fontSize:18,fontWeight:800}}>{v}</div><div style={{color:C.textM,fontSize:10}}>{l}</div></div>)}</div>
+              <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10}}><div style={{color:C.textM,fontSize:11,marginBottom:6}}>Current clients</div>{myC.slice(0,3).map(c=><div key={c.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:`1px solid rgba(255,255,255,0.04)`}}><span style={{color:C.textS,fontSize:11}}>{c.name}</span><span style={{color:c.roas>=3?C.green:C.orange,fontSize:11,fontWeight:700}}>ROAS {c.roas}</span></div>)}{myC.length===0&&<div style={{color:C.textM,fontSize:11}}>No clients assigned yet</div>}</div>
             </Card>);
           })}
         </div>
@@ -2193,29 +2226,29 @@ function AddCampaignModal({open,onClose,onAdd,clients,currentUser}){
   const sv=(k,v)=>setF(p=>({...p,[k]:v}));
   const autoRoas=f.spend&&f.purchaseValue?(+f.purchaseValue/+f.spend).toFixed(2):"";
   const sub=()=>{
-    if(!f.clientId){setErr("اختر العميل");return;}
-    if(!f.spend){setErr("أدخل الإنفاق على الأقل");return;}
+    if(!f.clientId){setErr("Select client");return;}
+    if(!f.spend){setErr("Enter at least the spend");return;}
     onAdd({...f,id:Date.now(),clientId:+f.clientId,spend:+f.spend||0,clicks:+f.clicks||0,impressions:+f.impressions||0,purchases:+f.purchases||0,purchaseValue:+f.purchaseValue||0,roas:+(f.roas||autoRoas)||0,ctr:+f.ctr||0,cpm:+f.cpm||0,cpc:+f.cpc||0,checkout:+f.checkout||0,addToCart:+f.addToCart||0});
     setF(E);setErr("");onClose();
   };
   return(
-    <Mdl open={open} onClose={()=>{setF(E);setErr("");onClose()}} title="📊 إضافة بيانات حملة" width={560}>
+    <Mdl open={open} onClose={()=>{setF(E);setErr("");onClose()}} title="📊 Add campaign data" width={560}>
       <div style={{background:`${C.purple}10`,border:`1px solid ${C.purple}25`,borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:12,color:C.textS}}>
-        أدخل الأرقام من لوحات المنصات مباشرة — Meta Ads / TikTok Ads / Snapchat Ads / Google Ads
+        Enter the numbers directly from the ad platform dashboards: Meta Ads / TikTok Ads / Snapchat Ads / Google Ads
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
-        <Sel label="العميل" value={f.clientId} onChange={v=>sv("clientId",v)} opts={myClients.map(c=>({v:c.id,l:c.name}))} req/>
-        <Sel label="المنصة" value={f.platform} onChange={v=>sv("platform",v)} opts={PLATS.map(p=>({v:p,l:p}))} req/>
-        <Inp label="تاريخ الأسبوع" value={f.week} onChange={v=>sv("week",v)} type="date" req mb={0}/>
+        <Sel label="Client" value={f.clientId} onChange={v=>sv("clientId",v)} opts={myClients.map(c=>({v:c.id,l:c.name}))} req/>
+        <Sel label="Platform" value={f.platform} onChange={v=>sv("platform",v)} opts={PLATS.map(p=>({v:p,l:p}))} req/>
+        <Inp label="Week start" value={f.week} onChange={v=>sv("week",v)} type="date" req mb={0}/>
       </div>
-      <div style={{margin:"14px 0 10px",fontSize:12,fontWeight:600,color:C.textS,borderBottom:`1px solid ${C.border}`,paddingBottom:6}}>أرقام الأداء</div>
+      <div style={{margin:"14px 0 10px",fontSize:12,fontWeight:600,color:C.textS,borderBottom:`1px solid ${C.border}`,paddingBottom:6}}>Performance numbers</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10}}>
-        <Inp label="💸 الإنفاق (SAR)" value={f.spend} onChange={v=>sv("spend",v)} type="number" placeholder="5000" req mb={0}/>
+        <Inp label="💸 Spend (SAR)" value={f.spend} onChange={v=>sv("spend",v)} type="number" placeholder="5000" req mb={0}/>
         <Inp label="🖱️ Clicks" value={f.clicks} onChange={v=>sv("clicks",v)} type="number" placeholder="3000" mb={0}/>
         <Inp label="👁️ Impressions" value={f.impressions} onChange={v=>sv("impressions",v)} type="number" placeholder="350000" mb={0}/>
         <Inp label="🛒 Purchases" value={f.purchases} onChange={v=>sv("purchases",v)} type="number" placeholder="65" mb={0}/>
         <Inp label="💰 Purchase Value (SAR)" value={f.purchaseValue} onChange={v=>sv("purchaseValue",v)} type="number" placeholder="55000" mb={0}/>
-        <Inp label="📈 ROAS (أو تلقائي)" value={f.roas} onChange={v=>sv("roas",v)} type="number" placeholder={autoRoas||"3.5"} mb={0}/>
+        <Inp label="📈 ROAS (or automatic)" value={f.roas} onChange={v=>sv("roas",v)} type="number" placeholder={autoRoas||"3.5"} mb={0}/>
         <Inp label="CTR %" value={f.ctr} onChange={v=>sv("ctr",v)} type="number" placeholder="0.9" mb={0}/>
         <Inp label="CPM (SAR)" value={f.cpm} onChange={v=>sv("cpm",v)} type="number" placeholder="13" mb={0}/>
         <Inp label="CPC (SAR)" value={f.cpc} onChange={v=>sv("cpc",v)} type="number" placeholder="1.5" mb={0}/>
@@ -2223,20 +2256,20 @@ function AddCampaignModal({open,onClose,onAdd,clients,currentUser}){
         <Inp label="Add to Cart" value={f.addToCart} onChange={v=>sv("addToCart",v)} type="number" placeholder="80" mb={0}/>
       </div>
       {autoRoas&&<div style={{marginTop:12,padding:"9px 14px",background:`${C.green}10`,border:`1px solid ${C.green}30`,borderRadius:10,display:"flex",justifyContent:"space-between"}}>
-        <span style={{color:C.textS,fontSize:12}}>ROAS محسوب تلقائياً من الأرقام</span>
+        <span style={{color:C.textS,fontSize:12}}>ROAS is calculated automatically from the numbers</span>
         <span style={{color:C.green,fontSize:15,fontWeight:800}}>{autoRoas}</span>
       </div>}
       {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginTop:12,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
       <div style={{display:"flex",gap:10,marginTop:14}}>
-        <Btn onClick={sub} style={{flex:1,padding:13}}>✓ حفظ الحملة</Btn>
-        <button onClick={()=>{setF(E);setErr("");onClose()}} style={{padding:"12px 20px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:12,color:C.textS,fontSize:14,fontFamily:"Cairo",cursor:"pointer"}}>إلغاء</button>
+        <Btn onClick={sub} style={{flex:1,padding:13}}>✓ Save campaign</Btn>
+        <button onClick={()=>{setF(E);setErr("");onClose()}} style={{padding:"12px 20px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:12,color:C.textS,fontSize:14,fontFamily:"Cairo",cursor:"pointer"}}>Cancel</button>
       </div>
     </Mdl>
   );
 }
 
 const PLATFORM_STATS_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/platform-stats";
-const STAT_METRICS = [["spend","الإنفاق"],["impressions","مرات الظهور"],["swipes","السحبات"],["video_views","مشاهدات الفيديو"],["conversion_purchases","المشتريات"],["conversion_purchases_value","قيمة المشتريات"]];
+const STAT_METRICS = [["spend","Spend"],["impressions","Impressions"],["swipes","Swipes"],["video_views","Video views"],["conversion_purchases","Purchases"],["conversion_purchases_value","Purchase value"]];
 function AccStats({a}){
   const iso=(d)=>d.toISOString().slice(0,10);
   const [open,setOpen]=useState(false);
@@ -2247,15 +2280,15 @@ function AccStats({a}){
   const [err,setErr]=useState("");
   const [busy,setBusy]=useState(false);
   const load=async()=>{
-    if(!sel.length){setErr("اختار مقياس واحد على الأقل");return;}
+    if(!sel.length){setErr("Select at least one metric");return;}
     setBusy(true);setErr("");
     try{
       const u=new URL(PLATFORM_STATS_URL);
       u.searchParams.set("accountId",a.id);u.searchParams.set("from",from);u.searchParams.set("to",to);u.searchParams.set("metrics",sel.join(","));
       const r=await wmAuthFetch(u.toString());const j=await r.json();
-      if(!r.ok||j.error){setErr(j.error==="needs_reauth"||j.error==="no_connection"?"لازم تعيد ربط الحساب":j.error==="forbidden"?"مش مسموح ليك بالحساب ده":"حصل خطأ في جلب الأرقام");setData(null);}
+      if(!r.ok||j.error){setErr(j.error==="needs_reauth"||j.error==="no_connection"?"The account must be reconnected":j.error==="forbidden"?"You do not have access to this account":"Error fetching the numbers");setData(null);}
       else setData(j);
-    }catch(e){setErr("حصل خطأ في الاتصال");}
+    }catch(e){setErr("Connection error");}
     setBusy(false);
   };
   const byCamp={};
@@ -2265,21 +2298,21 @@ function AccStats({a}){
   const inp={padding:"6px 8px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,color:C.text,fontSize:11,fontFamily:"Cairo",outline:"none"};
   return(
     <div style={{marginTop:10}}>
-      <button onClick={()=>{const n=!open;setOpen(n);if(n&&!data)load();}} style={{padding:"6px 12px",borderRadius:9,background:`${C.blue}15`,border:`1px solid ${C.blue}35`,color:C.blue,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{open?"إخفاء الحملات":"📈 عرض الحملات والأرقام"}</button>
+      <button onClick={()=>{const n=!open;setOpen(n);if(n&&!data)load();}} style={{padding:"6px 12px",borderRadius:9,background:`${C.blue}15`,border:`1px solid ${C.blue}35`,color:C.blue,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{open?"Hide campaigns":"📈 Show campaigns and numbers"}</button>
       {open&&<div style={{marginTop:10}}>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
           <input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={inp}/>
           <input type="date" value={to} onChange={e=>setTo(e.target.value)} style={inp}/>
           {STAT_METRICS.map(([k,l])=><label key={k} style={{color:C.textS,fontSize:11,display:"flex",gap:4,alignItems:"center"}}><input type="checkbox" checked={sel.includes(k)} onChange={e=>setSel(e.target.checked?[...sel,k]:sel.filter(x=>x!==k))}/>{l}</label>)}
-          <button onClick={load} disabled={busy} style={{padding:"6px 12px",borderRadius:9,background:C.blue,border:"none",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{busy?"⏳":"تحديث"}</button>
+          <button onClick={load} disabled={busy} style={{padding:"6px 12px",borderRadius:9,background:C.blue,border:"none",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{busy?"⏳":"Refresh"}</button>
         </div>
         {err&&<div style={{color:C.red,fontSize:11}}>{err}</div>}
-        {data&&!camps.length&&<div style={{color:C.textM,fontSize:11}}>مفيش حملات في الحساب ده.</div>}
+        {data&&!camps.length&&<div style={{color:C.textM,fontSize:11}}>No campaigns in this account.</div>}
         {camps.length>0&&<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11,color:C.text}}>
-          <thead><tr><th style={{textAlign:"right",padding:6}}>الحملة</th>{sel.map(k=><th key={k} style={{textAlign:"right",padding:6}}>{lbl[k]}{(k==="spend"||k==="conversion_purchases_value")?` (${data?.currency||"عملة غير معروفة"})`:""}</th>)}</tr></thead>
-          <tbody>{camps.map((c,i)=><tr key={i} style={{borderTop:`1px solid ${C.border}`}}><td style={{padding:6}}>{c.name}{c.status?` · ${c.status}`:""}{c.noData?" · بدون أرقام في الفترة":""}</td>{sel.map(k=><td key={k} style={{padding:6}}>{c.noData?"—":(c.m[k]||0).toLocaleString("en-US",{maximumFractionDigits:2})}</td>)}</tr>)}</tbody>
+          <thead><tr><th style={{textAlign:"right",padding:6}}>Campaign</th>{sel.map(k=><th key={k} style={{textAlign:"right",padding:6}}>{lbl[k]}{(k==="spend"||k==="conversion_purchases_value")?` (${data?.currency||"Unknown currency"})`:""}</th>)}</tr></thead>
+          <tbody>{camps.map((c,i)=><tr key={i} style={{borderTop:`1px solid ${C.border}`}}><td style={{padding:6}}>{c.name}{c.status?` · ${c.status}`:""}{c.noData?" · no numbers in the period":""}</td>{sel.map(k=><td key={k} style={{padding:6}}>{c.noData?"—":(c.m[k]||0).toLocaleString("en-US",{maximumFractionDigits:2})}</td>)}</tr>)}</tbody>
         </table></div>}
-        {data&&<div style={{color:C.textM,fontSize:10,marginTop:6}}>آخر جلب: {new Date(data.fetched_at).toLocaleString("ar-EG")}{data.cached?" (من الكاش — ممكن يكون متخزن لحد 5 دقائق)":""}</div>}
+        {data&&<div style={{color:C.textM,fontSize:10,marginTop:6}}>Last fetched: {new Date(data.fetched_at).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})}{data.cached?" (cached, up to 5 minutes old)":""}</div>}
       </div>}
     </div>
   );
@@ -2295,7 +2328,7 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
   const AccRow=({a})=>{
     const client=clients.find(c=>c.id===a.client_id);
     const statusColor=a.status==="connected"?C.green:a.status==="error"?C.red:a.status==="paused"?C.orange:C.textM;
-    const statusLabel=a.status==="connected"?"متصل":a.status==="error"?"فيه مشكلة":a.status==="paused"?"موقوف":"غير مربوط";
+    const statusLabel=a.status==="connected"?"Connected":a.status==="error"?"Problem":a.status==="paused"?"Paused":"Not linked";
     return(
       <Card key={a.id} s={{marginBottom:10}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
@@ -2309,16 +2342,16 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
           </div>
           <select value={a.client_id||""} onChange={e=>onLinkAccount(a.id, e.target.value||null)}
             style={{padding:"8px 12px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none",minWidth:160}}>
-            <option value="">— اختر العميل —</option>
+            <option value="">— Select client —</option>
             {clients.filter(c=>c.id===a.client_id||!linked.some(x=>x.client_id===c.id&&x.platform===a.platform)).map(c=>
               <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           {isAdmin && a.client_id && (
-            <button onClick={()=>onSyncNow(a.id)} disabled={metaSyncing} title="مزامنة الأرقام دلوقتي"
-              style={{padding:"7px 12px",borderRadius:9,background:`${C.blue}15`,border:`1px solid ${C.blue}35`,color:C.blue,fontSize:11,fontWeight:600,cursor:metaSyncing?"not-allowed":"pointer",opacity:metaSyncing?0.6:1,fontFamily:"Cairo"}}>🔄 مزامنة</button>
+            <button onClick={()=>onSyncNow(a.id)} disabled={metaSyncing} title="Sync numbers now"
+              style={{padding:"7px 12px",borderRadius:9,background:`${C.blue}15`,border:`1px solid ${C.blue}35`,color:C.blue,fontSize:11,fontWeight:600,cursor:metaSyncing?"not-allowed":"pointer",opacity:metaSyncing?0.6:1,fontFamily:"Cairo"}}>🔄 Sync</button>
           )}
         </div>
-        {a.last_synced_at && <div style={{color:C.textM,fontSize:10,marginTop:8}}>آخر مزامنة: {fmtDate(a.last_synced_at)}</div>}
+        {a.last_synced_at && <div style={{color:C.textM,fontSize:10,marginTop:8}}>Last sync: {fmtDate(a.last_synced_at)}</div>}
         {(a.client_id||isAdmin) && a.platform==="Snapchat" && <AccStats a={a}/>}
       </Card>
     );
@@ -2327,46 +2360,46 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
         <div style={{color:C.textS,fontSize:12}}>
-          {adAccounts.length===0 ? "مفيش حسابات إعلانية متصلة لسه." : `${linked.length} مربوط · ${unlinked.length} من غير عميل`}
+          {adAccounts.length===0 ? "No ad accounts connected yet." : `${linked.length} Linked · ${unlinked.length} No client`}
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <Btn onClick={onConnectMeta} disabled={metaSyncing}>{metaSyncing?"⏳ جاري...":"📘 ربط حساب ميتا"}</Btn>
-          <Btn onClick={onConnectSnap} disabled={metaSyncing} color="linear-gradient(135deg,#FFFC00,#FFE600)" style={{color:"#111"}}>{metaSyncing?"⏳ جاري...":"👻 ربط حساب سناب شات"}</Btn>
+          <Btn onClick={onConnectMeta} disabled={metaSyncing}>{metaSyncing?"⏳ Working...":"📘 Connect Meta account"}</Btn>
+          <Btn onClick={onConnectSnap} disabled={metaSyncing} color="linear-gradient(135deg,#FFFC00,#FFE600)" style={{color:"#111"}}>{metaSyncing?"⏳ Working...":"👻 Connect Snapchat account"}</Btn>
           {isAdmin && linked.length>0 && (
-            <Btn onClick={()=>onSyncNow()} disabled={metaSyncing} color={`linear-gradient(135deg, ${C.blue}, #6366F1)`}>{metaSyncing?"⏳ جاري المزامنة...":"🔄 مزامنة الكل دلوقتي"}</Btn>
+            <Btn onClick={()=>onSyncNow()} disabled={metaSyncing} color={`linear-gradient(135deg, ${C.blue}, #6366F1)`}>{metaSyncing?"⏳ Syncing...":"🔄 Sync all now"}</Btn>
           )}
         </div>
       </div>
       {isAdmin && linked.length>0 && (
         <Card s={{marginBottom:20,display:"flex",alignItems:"flex-end",gap:10,flexWrap:"wrap"}}>
           <div>
-            <div style={{color:C.textS,fontSize:11,marginBottom:5}}>من تاريخ</div>
+            <div style={{color:C.textS,fontSize:11,marginBottom:5}}>From date</div>
             <input type="date" value={rangeFrom} onChange={e=>setRangeFrom(e.target.value)}
               style={{padding:"8px 10px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:9,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none"}}/>
           </div>
           <div>
-            <div style={{color:C.textS,fontSize:11,marginBottom:5}}>لحد تاريخ (اختياري)</div>
+            <div style={{color:C.textS,fontSize:11,marginBottom:5}}>To date (optional)</div>
             <input type="date" value={rangeTo} onChange={e=>setRangeTo(e.target.value)}
               style={{padding:"8px 10px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:9,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none"}}/>
           </div>
-          <Btn onClick={()=>{ if(!rangeFrom){alert("اختاري تاريخ البداية الأول");return;} onSyncRange(rangeFrom, rangeTo||null); }} disabled={metaSyncing} color={`linear-gradient(135deg, ${C.orange}, #EA580C)`}>
-            {metaSyncing?"⏳ جاري الاستيراد...":"📥 استيراد الفترة دي كلها"}
+          <Btn onClick={()=>{ if(!rangeFrom){alert("Pick the start date first");return;} onSyncRange(rangeFrom, rangeTo||null); }} disabled={metaSyncing} color={`linear-gradient(135deg, ${C.orange}, #EA580C)`}>
+            {metaSyncing?"⏳ Importing...":"📥 Import this whole period"}
           </Btn>
-          <div style={{color:C.textM,fontSize:10,flexBasis:"100%"}}>ده هيسحب كل الأسابيع من التاريخ ده لحد دلوقتي (أو لحد التاريخ التاني لو حطيتيه) — ممكن ياخد وقت أطول شوية</div>
+          <div style={{color:C.textM,fontSize:10,flexBasis:"100%"}}>This pulls every week from that date until now (or until the end date if set). It can take a while.</div>
         </Card>
       )}
       {adAccounts.length===0 && (
         <Card s={{textAlign:"center",padding:"60px"}}>
           <div style={{fontSize:40,marginBottom:12}}>🔗</div>
-          <div style={{color:C.textS,fontSize:14,marginBottom:16}}>اربطي حساب ميتا أو سناب شات عشان تجيب كل البيزنسات أوتوماتيك</div>
+          <div style={{color:C.textS,fontSize:14,marginBottom:16}}>Connect a Meta or Snapchat account to import all businesses automatically</div>
         </Card>
       )}
       {unlinked.length>0 && <>
-        <div style={{color:C.text,fontSize:13,fontWeight:700,marginBottom:10}}>محتاجة ربط بعميل ({unlinked.length})</div>
+        <div style={{color:C.text,fontSize:13,fontWeight:700,marginBottom:10}}>Need a client link ({unlinked.length})</div>
         {unlinked.map(a=><AccRow key={a.id} a={a}/>)}
       </>}
       {linked.length>0 && <>
-        <div style={{color:C.text,fontSize:13,fontWeight:700,margin:"18px 0 10px"}}>مربوطة بعملاء ({linked.length})</div>
+        <div style={{color:C.text,fontSize:13,fontWeight:700,margin:"18px 0 10px"}}>Linked to clients ({linked.length})</div>
         {linked.map(a=><AccRow key={a.id} a={a}/>)}
       </>}
     </div>
@@ -2379,42 +2412,42 @@ function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=
   const myClients=currentUser?.role==="media_buyer"?clients.filter(c=>c.mb===currentUser.id):clients;
   const filtered=campaigns.filter(c=>{
     if(!myClients.find(cl=>cl.id===c.clientId))return false;
-    if(sc!=="all"&&c.clientId!==+sc)return false;
+    if(sc!=="all"&&String(c.clientId)!==String(sc))return false;
     if(sp!=="all"&&c.platform!==sp)return false;
     return true;
   });
   return(
     <div>
       <AddCampaignModal open={addOpen} onClose={()=>setAddOpen(false)} onAdd={c=>setCampaigns(p=>[...p,c])} clients={clients} currentUser={currentUser}/>
-      <TB title="الحملات والأداء 📊" sub="أرقام الحملات عبر كل المنصات">
-        {tab==="data" && <Btn onClick={()=>setAddOpen(true)}>+ إضافة بيانات حملة</Btn>}
+      <TB title="Campaigns & Performance 📊" sub="Campaign numbers across all platforms">
+        {tab==="data" && <Btn onClick={()=>setAddOpen(true)}>+ Add campaign data</Btn>}
       </TB>
       <div className="wm-page" style={{padding:"0 32px"}}>
         <div style={{display:"flex",gap:8,marginBottom:20}}>
-          {[["data","📊 الحملات"],["businesses","🔗 البيزنسات"]].map(([id,label])=>(
+          {[["data","📊 Campaigns"],["businesses","🔗 Businesses"]].map(([id,label])=>(
             <button key={id} onClick={()=>setTab(id)} style={{padding:"9px 18px",borderRadius:10,background:tab===id?`${C.pink}18`:"transparent",border:tab===id?`1px solid ${C.pink}33`:`1px solid ${C.border}`,color:tab===id?C.pink:C.textS,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{label}</button>
           ))}
         </div>
         {tab==="businesses" && <BusinessesTab adAccounts={adAccounts} clients={clients} onLinkAccount={onLinkAccount} onConnectMeta={onConnectMeta} onConnectSnap={onConnectSnap} onSyncNow={onSyncNow} onSyncRange={onSyncRange} metaSyncing={metaSyncing} isAdmin={currentUser?.role==="admin"}/>}
         {tab==="data" && <>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
-          <StC label="الإنفاق الكلي" value={`${(filtered.reduce((s,c)=>s+c.spend,0)/1000).toFixed(0)}k SAR`} icon="💸" color={C.orange}/>
-          <StC label="متوسط ROAS" value={(filtered.length?filtered.reduce((s,c)=>s+c.roas,0)/filtered.length:0).toFixed(1)} icon="📈" color={C.green}/>
-          <StC label="إجمالي المبيعات" value={`${(filtered.reduce((s,c)=>s+(c.purchaseValue||0),0)/1000).toFixed(0)}k SAR`} icon="🛒" color={C.purple}/>
-          <StC label="إجمالي Purchases" value={filtered.reduce((s,c)=>s+(c.purchases||0),0)} icon="✅" color={C.blue}/>
+          <StC label="Total spend" value={`${(filtered.reduce((s,c)=>s+c.spend,0)/1000).toFixed(0)}k SAR`} icon="💸" color={C.orange}/>
+          <StC label="Average ROAS" value={(filtered.length?filtered.reduce((s,c)=>s+c.roas,0)/filtered.length:0).toFixed(1)} icon="📈" color={C.green}/>
+          <StC label="Total sales" value={`${(filtered.reduce((s,c)=>s+(c.purchaseValue||0),0)/1000).toFixed(0)}k SAR`} icon="🛒" color={C.purple}/>
+          <StC label="Total purchases" value={filtered.reduce((s,c)=>s+(c.purchases||0),0)} icon="✅" color={C.blue}/>
         </div>
         <div style={{display:"flex",gap:10,marginBottom:18}}>
           <select value={sc} onChange={e=>setSc(e.target.value)} style={{padding:"9px 14px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none"}}>
-            <option value="all">كل العملاء</option>
+            <option value="all">All clients</option>
             {myClients.filter(c=>c.status==="active").map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <select value={sp} onChange={e=>setSp(e.target.value)} style={{padding:"9px 14px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none"}}>
-            <option value="all">كل المنصات</option>
+            <option value="all">All platforms</option>
             {PLATS.map(p=><option key={p} value={p}>{p}</option>)}
           </select>
         </div>
         {filtered.length===0
-          ?<Card s={{textAlign:"center",padding:"60px"}}><div style={{fontSize:40,marginBottom:12}}>📊</div><div style={{color:C.textS,fontSize:14,marginBottom:16}}>لا توجد حملات — أضف أول حملة</div><Btn onClick={()=>setAddOpen(true)}>+ إضافة بيانات حملة</Btn></Card>
+          ?<Card s={{textAlign:"center",padding:"60px"}}><div style={{fontSize:40,marginBottom:12}}>📊</div><div style={{color:C.textS,fontSize:14,marginBottom:16}}>No campaigns yet. Add the first one.</div><Btn onClick={()=>setAddOpen(true)}>+ Add campaign data</Btn></Card>
           :filtered.map(camp=>{
             const client=clients.find(c=>c.id===camp.clientId);
             return(<Card key={camp.id} s={{marginBottom:12}}>
@@ -2429,11 +2462,12 @@ function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=
                   <button onClick={()=>setCampaigns(p=>p.filter(x=>x.id!==camp.id))} style={{padding:"4px 10px",borderRadius:7,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>
                 </div>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8}}>
-                {[["Spend",`${(camp.spend||0).toLocaleString()} SAR`,C.orange],["Clicks",(camp.clicks||0).toLocaleString(),C.blue],["Impressions",((camp.impressions||0)/1000).toFixed(0)+"k",C.purple],["CTR",`${camp.ctr||0}%`,C.teal],["Purchases",camp.purchases||0,C.green],["P.Value",`${((camp.purchaseValue||0)/1000).toFixed(0)}k SAR`,C.pink]].map(([l,v,co])=>(
-                  <div key={l} style={{textAlign:"center",padding:"8px 4px",background:"rgba(255,255,255,0.03)",borderRadius:8}}>
-                    <div style={{color:co,fontSize:13,fontWeight:700,marginBottom:2}}>{v}</div>
-                    <div style={{color:C.textM,fontSize:9}}>{l}</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8}}>
+                {(()=>{const sp=camp.spend,im=camp.impressions,ck=camp.clicks,pu=camp.purchases,pv=camp.purchaseValue;const has=(v)=>v!==null&&v!==undefined&&v!==""&&isFinite(Number(v));const rr=(a,b,k=1)=>(has(a)&&has(b)&&Number(b)>0)?Number(a)/Number(b)*k:null;const f=(v,d=0,suf="")=>(v===null||v===undefined||!isFinite(v))?"—":Number(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d})+suf;
+                return [["Spend",f(has(sp)?Number(sp):null,0," SAR"),C.orange],["Impressions",f(has(im)?Number(im):null),C.purple],["Clicks",f(has(ck)?Number(ck):null),C.blue],["CTR",f(has(camp.ctr)?Number(camp.ctr):rr(ck,im,100),2,"%"),C.teal],["CPC",f(rr(sp,ck),2),C.blue],["CPM",f(rr(sp,im,1000),2),C.purple],["Purchases",f(has(pu)?Number(pu):null),C.green],["Revenue",f(has(pv)?Number(pv):null,0," SAR"),C.pink],["CPA",f(rr(sp,pu),2),C.orange],["AOV",f(rr(pv,pu),2),C.pink],["ROAS",f(has(camp.roas)?Number(camp.roas):rr(pv,sp),2,"x"),(camp.roas||0)>=3?C.green:C.orange]];})().map(([l,v,co])=>(
+                  <div key={l} style={{padding:"10px 10px",background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:10,direction:"ltr",textAlign:"left"}}>
+                    <div style={{color:C.textM,fontSize:10,letterSpacing:0.5,textTransform:"uppercase",marginBottom:4}}>{l}</div>
+                    <div style={{color:co,fontSize:15,fontWeight:800}}>{v}</div>
                   </div>
                 ))}
               </div>
