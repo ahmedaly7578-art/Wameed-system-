@@ -19,7 +19,10 @@ const META_OAUTH_FUNCTION_URL = "https://jokdohhukkbrergfauwc.supabase.co/functi
 // Must match the META_OAUTH_SECRET you set as a Supabase secret for that function.
 // Staff session token for server functions (admin-checked on the server). No shared secrets in the browser.
 const wmToken=async()=>{for(let i=0;i<60&&!window.__SB;i++)await new Promise(r=>setTimeout(r,100));const s=window.__SB?await window.__SB.auth.getSession():null;return s?.data?.session?.access_token||"";};
-const wmAuthFetch=async(url,opts={})=>{const t=await wmToken();return fetch(url,{...opts,headers:{...(opts.headers||{}),Authorization:`Bearer ${t}`,apikey:"sb_publishable_DkwiFcNG0im57wftL-lATw_l4Z1TCvs"}});};
+const wmAuthFetch=async(url,opts={})=>{const go=t=>fetch(url,{...opts,headers:{...(opts.headers||{}),Authorization:`Bearer ${t}`,apikey:"sb_publishable_DkwiFcNG0im57wftL-lATw_l4Z1TCvs"}});
+let t=await wmToken();let r=await go(t);
+if(r.status===401&&window.__SB){try{const x=await window.__SB.auth.refreshSession();const t2=x?.data?.session?.access_token;if(t2){r=await go(t2);}else{try{await window.__SB.auth.signOut();}catch(e){}alert("انتهت الجلسة، سجّل الدخول مرة تانية");location.reload();}}catch(e){}}
+return r;};
 
 // ─── Snapchat OAuth — same idea, different platform ──────────────────────────
 const SNAP_CLIENT_ID = "7ae89022-dcbf-4d7d-acbd-0a9e2d598ec4";
