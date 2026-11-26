@@ -3,7 +3,7 @@ import { LOGOS } from "./brandLogos.js";
 
 const C={bg:"#070E1F",bgCard:"#0D1526",bgHover:"#111E35",bgModal:"#0A1220",border:"rgba(255,255,255,0.07)",borderH:"rgba(255,255,255,0.14)",text:"#F1F5FF",textS:"rgba(255,255,255,0.5)",textM:"rgba(255,255,255,0.25)",pink:"#E879A0",purple:"#7B6FE0",green:"#34D399",blue:"#60A5FA",orange:"#F59E0B",red:"#F87171",teal:"#2DD4BF",grad:"linear-gradient(135deg,#E879A0 0%,#7B6FE0 100%)"};
 const RC={admin:C.pink,media_buyer:C.purple,social_media:C.green,account_manager:C.blue,designer:C.teal};
-const RL={admin:"مدير النظام",media_buyer:"Media Buyer",social_media:"Social Media",account_manager:"Account Manager",designer:"Designer"};
+const RL={admin:"مدير النظام",media_buyer:"Media Buyer",social_media:"Social Media",account_manager:"Account Manager",designer:"Designer",viewer:"مشاهدة فقط"};
 const SL={active:"نشط",hold:"موقوف",cancelled:"ملغي",pending:"قيد التفعيل"};
 const SC={active:C.green,hold:C.orange,cancelled:C.red,pending:C.blue};
 const PLATS=["Meta","Snapchat","TikTok","Google","YouTube","X"];
@@ -204,6 +204,7 @@ const NAV=[
   {id:"satisfaction",icon:"⭐",label:"رضا العملاء"},
   {id:"payroll",icon:"💰",label:"الرواتب",admin:true},
   {id:"team",icon:"🧑‍💼",label:"إدارة الفريق",admin:true},
+  {id:"audit",icon:"🧾",label:"سجل التعديلات",admin:true},
 ];
 
 // ═══ AVATAR UPLOAD ════════════════════════════════════════════════════════════
@@ -314,7 +315,7 @@ function Sidebar({page,setPage,user,onLogout,unread,onAvatarSaved,open,onClose})
 }
 
 // ═══ DASHBOARD ════════════════════════════════════════════════════════════════
-function Dashboard({clients,users,notifs,followups,tasks}){
+function Dashboard({clients,users,notifs,followups,tasks,currentUser}){
   const active=clients.filter(c=>c.status==="active");
   const renew=clients.filter(c=>{const d=dl(c.end);return d>0&&d<=14&&c.status==="active"});
   const rev=active.reduce((s,c)=>s+c.pkg,0);
@@ -337,6 +338,7 @@ function Dashboard({clients,users,notifs,followups,tasks}){
           <StC label="متوسط ROAS (مُدخل يدوياً في بيانات العميل)" value={avgR} icon="📈" color={C.purple}/>
           <StC label="تجديد خلال 14 يوم" value={renew.length} icon="🔔" color={C.orange}/>
         </div>
+        {(currentUser?.role==="admin"||currentUser?.role==="viewer")&&<DigestCard currentUser={currentUser}/>}
         {(late.length>0||lateTasks.length>0)&&(
           <div style={{display:"grid",gridTemplateColumns:late.length>0&&lateTasks.length>0?"1fr 1fr":"1fr",gap:14,marginBottom:20}}>
             {late.length>0&&<div style={{background:"rgba(248,113,113,0.07)",border:"1px solid rgba(248,113,113,0.2)",borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
@@ -935,8 +937,69 @@ function ClientNotes({client,notes,setNotes,users,onBack,currentUser}){
   );
 }
 
+
+// ═══ DAILY DIGEST + AUDIT LOG ═══════════════════════════════════════════════
+const wmUseLive=(fn,deps)=>{useEffect(()=>{let on=true;const run=()=>{Promise.resolve(fn()).catch(()=>{})};run();const h=()=>{if(on)run();};window.addEventListener("wm-refresh",h);return()=>{on=false;window.removeEventListener("wm-refresh",h);};},deps||[]);};
+function DigestCard({currentUser}){
+  const [row,setRow]=useState(null);const [busy,setBusy]=useState(false);const [err,setErr]=useState("");
+  const load=async()=>{for(let i=0;i<60&&!window.__SB;i++)await new Promise(r=>setTimeout(r,100));const r=await window.__SB.from("daily_digest").select("digest_date,data,created_at").order("digest_date",{ascending:false}).limit(1);if(!r.error)setRow((r.data||[])[0]||null);};
+  wmUseLive(load,[]);
+  const rebuild=async()=>{setBusy(true);setErr("");try{const r=await window.__SB.rpc("wm_build_digest");if(r.error)throw r.error;await load();}catch(e){setErr("تعذر تحديث الملخص");}setBusy(false);};
+  const d=row?.data;const L=({t,children})=><div style={{marginBottom:10}}><div style={{color:C.textS,fontSize:11,fontWeight:700,marginBottom:4}}>{t}</div>{children}</div>;
+  const none=<div style={{color:C.green,fontSize:12}}>✓ لا شيء</div>;
+  const ago=(x)=>{if(!x)return "لا يوجد";const h=Math.round((Date.now()-new Date(x))/3600000);return h<1?"قبل أقل من ساعة":`قبل ${h} ساعة`;};
+  return(
+    <Card s={{marginBottom:20,padding:"16px 18px"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,gap:10,flexWrap:"wrap"}}>
+        <div style={{color:C.text,fontSize:14,fontWeight:800}}>🗞️ ملخص اليوم {d?<span style={{color:C.textM,fontSize:11,fontWeight:400}}> · بيانات {d.for_date} · اتحدث {ago(row.created_at)}</span>:null}</div>
+        {currentUser?.role==="admin"&&<button onClick={rebuild} disabled={busy} style={{padding:"6px 12px",borderRadius:9,background:`${C.purple}22`,border:`1px solid ${C.purple}44`,color:C.purple,fontSize:12,fontFamily:"Cairo",cursor:"pointer"}}>{busy?"جاري...":"تحديث الآن"}</button>}
+      </div>
+      {err&&<div style={{color:C.red,fontSize:12,marginBottom:8}}>{err}</div>}
+      {!d?<div style={{color:C.textM,fontSize:12}}>لسه مفيش ملخص. بيتولد تلقائي كل يوم الساعة 8:50 صباحاً بتوقيت القاهرة.</div>:(
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:16,direction:"rtl"}}>
+          <L t="💸 صرف أمس">{(d.spend_by_platform||[]).length?(d.spend_by_platform||[]).map((x,i)=><div key={i} style={{color:C.text,fontSize:12}}>{x.platform}: <b dir="ltr">{x.spend} {x.currency}</b> · {x.purchases} عملية شراء</div>):none}</L>
+          <L t="⚠️ صرف من غير نتائج">{(d.spend_no_results||[]).length?(d.spend_no_results||[]).map((x,i)=><div key={i} style={{color:C.orange,fontSize:12}}>{x.client} · {x.platform} · <span dir="ltr">{x.spend} {x.currency}</span></div>):none}</L>
+          <L t="⏹ حملات وقفت صرف">{(d.stopped_campaigns||[]).length?(d.stopped_campaigns||[]).slice(0,8).map((x,i)=><div key={i} style={{color:C.text,fontSize:12}}>{x.campaign} <span style={{color:C.textM}}>({x.client})</span></div>):none}</L>
+          <L t="📌 متابعات متأخرة">{(d.overdue_followups||[]).length?(d.overdue_followups||[]).map((x,i)=><div key={i} style={{color:C.red,fontSize:12}}>{x.staff}: {x.count} عميل</div>):none}</L>
+          <L t="🔄 حالة السينك"><div style={{color:C.textS,fontSize:12}}>سناب: {ago(d.sync?.snap_last)} · ميتا: {ago(d.sync?.meta_last)}</div><div style={{color:C.textS,fontSize:12}}>{d.sync?.active_campaigns} حملة نشطة · {d.sync?.unlinked_accounts} حساب إعلاني غير مربوط بعميل</div></L>
+        </div>
+      )}
+    </Card>
+  );
+}
+const AUDIT_T={clients:"عميل",users:"موظف",ad_accounts:"حساب إعلاني",follow_ups:"متابعة",tasks:"مهمة",campaigns:"حملة",client_notes:"ملاحظة",satisfaction:"تقييم",targets:"هدف"};
+const AUDIT_A={INSERT:["إضافة",C.green],UPDATE:["تعديل",C.orange],DELETE:["حذف",C.red]};
+function AuditLog(){
+  const [rows,setRows]=useState(null);const [q,setQ]=useState("");const [f,setF]=useState("all");
+  const load=async()=>{for(let i=0;i<60&&!window.__SB;i++)await new Promise(r=>setTimeout(r,100));const r=await window.__SB.from("audit_log").select("*").order("at",{ascending:false}).limit(300);setRows(r.data||[]);};
+  wmUseLive(load,[]);
+  const sum=(x)=>{const c=x.changes||{};if(x.action!=="UPDATE")return "";return Object.keys(c).slice(0,4).map(k=>{const v=c[k];if(v&&typeof v==="object"&&"from" in v){const a=String(v.from??"—").slice(0,24),b=String(v.to??"—").slice(0,24);return `${k}: ${a} ← ${b}`;}return `${k}: ${v}`;}).join(" · ");};
+  const list=(rows||[]).filter(x=>(f==="all"||x.action===f)&&(!q||((x.actor||"")+(x.label||"")+(AUDIT_T[x.table_name]||x.table_name)).toLowerCase().includes(q.toLowerCase())));
+  return(
+    <div>
+      <TB title="سجل التعديلات 🧾" sub="مين عدّل أو مسح أو أضاف إيه ومتى (آخر 300 عملية، بيتحدث لحظياً)"/>
+      <div className="wm-page" style={{padding:"0 32px"}}>
+        <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="بحث بالاسم أو الموظف..." style={{flex:1,minWidth:200,padding:"9px 12px",background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontFamily:"Cairo",fontSize:13}}/>
+          {["all","INSERT","UPDATE","DELETE"].map(a=><button key={a} onClick={()=>setF(a)} style={{padding:"8px 14px",borderRadius:20,fontFamily:"Cairo",fontSize:12,cursor:"pointer",border:"1px solid",background:f===a?`${C.pink}18`:"transparent",borderColor:f===a?C.pink:C.border,color:f===a?C.pink:C.textS}}>{a==="all"?"الكل":AUDIT_A[a][0]}</button>)}
+        </div>
+        {rows===null?<div style={{color:C.textM}}>جاري التحميل...</div>:list.length===0?<Card s={{padding:30,textAlign:"center",color:C.textM}}>لا توجد عمليات بعد. أي تعديل أو حذف من الآن هيظهر هنا.</Card>:list.map(x=>{const a=AUDIT_A[x.action]||[x.action,C.textS];return(
+          <Card key={x.id} s={{marginBottom:8,padding:"10px 14px"}}>
+            <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+              <span style={{fontSize:11,fontWeight:700,color:a[1],minWidth:44}}>{a[0]}</span>
+              <span style={{fontSize:12,color:C.text,fontWeight:700}}>{AUDIT_T[x.table_name]||x.table_name}{x.label?` · ${x.label}`:""}</span>
+              <span style={{fontSize:11,color:C.textS,direction:"ltr"}}>{x.actor}</span>
+              <span style={{fontSize:11,color:C.textM,marginRight:"auto"}}>{new Date(x.at).toLocaleString("ar-EG",{timeZone:"Africa/Cairo"})}</span>
+            </div>
+            {sum(x)&&<div style={{fontSize:11,color:C.textM,marginTop:4,direction:"ltr",textAlign:"left"}}>{sum(x)}</div>}
+          </Card>);})}
+      </div>
+    </div>
+  );
+}
+
 // ═══ CLIENTS PAGE ═════════════════════════════════════════════════════════════
-function AddClientModal({open,onClose,onAdd,users}){
+function AddClientModal({open,onClose,onAdd,users,clients}){
   const mbs=users.filter(u=>u.role==="media_buyer");
   const sms=users.filter(u=>u.role==="social_media");
   const ams=users.filter(u=>u.role==="account_manager");
@@ -947,7 +1010,8 @@ function AddClientModal({open,onClose,onAdd,users}){
   const sub=()=>{
     if(!f.name.trim()){setErr("اكتب اسم العميل (في تبويب بيانات أساسية)");setStep(1);return;}
     if(f.email.trim()&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())){setErr("البريد الإلكتروني غير صحيح");return;}
-    if(f.email.trim()&&!f.password){setErr("اكتب كلمة مرور للبوابة أو امسح البريد");return;}
+    if(f.email.trim()&&f.password.length<8){setErr("كلمة مرور البوابة 8 حروف على الأقل (أو امسح البريد)");return;}
+    if(f.email.trim()&&((clients||[]).some(x=>(x.email||"").toLowerCase()===f.email.trim().toLowerCase())||(users||[]).some(x=>(x.email||"").toLowerCase()===f.email.trim().toLowerCase()))){setErr("البريد ده مستخدم بالفعل. كل عميل لازم يكون له بريد منفصل");return;}
     onAdd({...f,email:f.email.trim(),id:Date.now(),pkg:+(f.pkg||0),roas:+(f.roas||0),spend:+(f.spend||0),mb:f.mb?+f.mb:null,sm:f.sm?+f.sm:null,am:f.am?+f.am:null,start:f.start||null,end:f.end||null});
     setF(E);setErr("");setStep(1);onClose();
   };
@@ -1056,7 +1120,7 @@ function ClientShots({client,currentUser}){
     </div>);
 }
 
-function ClientDetail({currentUser,c,users,onBack,notes,setNotes,satisfaction,campaigns,setClients}){
+function ClientDetail({currentUser,c,users,clients,onBack,notes,setNotes,satisfaction,campaigns,setClients}){
   const [tab,setTab]=useState("overview");
   const [credOpen,setCredOpen]=useState(false);
   const [credF,setCredF]=useState({email:c?.email||"",password:c?.password||""});
@@ -1082,6 +1146,8 @@ function ClientDetail({currentUser,c,users,onBack,notes,setNotes,satisfaction,ca
   const avgSat=mySat.length?(mySat.reduce((s,x)=>s+x.score,0)/mySat.length).toFixed(1):null;
 
   const saveCreds=()=>{
+    const em=(credF.email||"").trim().toLowerCase();if(em&&((clients||[]).some(x=>x.id!==c.id&&(x.email||"").toLowerCase()===em)||(users||[]).some(x=>(x.email||"").toLowerCase()===em))){window.alert("البريد ده مستخدم بالفعل. كل عميل لازم يكون له بريد منفصل");return;}
+    if(em&&(credF.password||"").length<8){window.alert("كلمة المرور 8 حروف على الأقل");return;}
     setClients(p=>p.map(x=>x.id===c.id?{...x,email:credF.email,password:credF.password}:x));
     setCredOpen(false);
   };
@@ -1606,7 +1672,7 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
   });
 
   if(sel) return(
-    <ClientDetail
+    <ClientDetail clients={clients}
       currentUser={currentUser}
       c={sel}
       users={users||[]}
@@ -1621,7 +1687,7 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
 
   return(
     <div>
-      <AddClientModal open={addOpen} onClose={()=>setAddOpen(false)} onAdd={cl=>setClients(p=>[...p,cl])} users={users}/>
+      <AddClientModal open={addOpen} onClose={()=>setAddOpen(false)} onAdd={cl=>setClients(p=>[...p,cl])} users={users} clients={clients}/>
       <TB title="العملاء 👥" sub={`${clients.length} إجمالي · ${clients.filter(c=>c.status==="active").length} نشط · ${clients.filter(c=>c.email).length} لديهم بوابة`}>
         {currentUser?.role==="admin"&&<Btn onClick={()=>setAddOpen(true)}>+ إضافة عميل</Btn>}
       </TB>
@@ -2476,7 +2542,7 @@ function ActiveCampaignsTab({clients,currentUser}){
       if(r.error)throw r.error;setRows(r.data||[]);setErr("");
     }catch(e){setErr("Could not load the campaigns");setRows([]);}
   };
-  useEffect(()=>{load();},[]);
+  useEffect(()=>{load();const h=()=>load();window.addEventListener("wm-refresh",h);return()=>window.removeEventListener("wm-refresh",h);},[]);
   const refresh=async()=>{
     setBusy("Fetching from Snapchat...");
     try{for(const p of ["Snapchat","Meta"]){setBusy("Fetching from "+p+"...");const r=await wmAuthFetch(ACTIVE_CAMPAIGNS_URL+"?platform="+p,{method:"POST"});if(!r.ok)throw new Error("x");const j=await r.json();if(p==="Meta"&&j.errors&&j.errors.no_valid_meta_token){setErr("The Meta connection expired. Reconnect it from the Businesses tab (Connect Meta account).");setBusy("");await load();return;}}setErr("");}catch(e){setErr("Refresh failed or timed out. Try again.");}
@@ -2881,7 +2947,7 @@ function TeamMgmt({users,setUsers}){
         <Inp label="البريد الإلكتروني" value={f.email} onChange={v=>sf("email",v)} type="email" req placeholder="ahmed@wameed.sa"/>
         <Inp label="كلمة المرور" value={f.password} onChange={v=>sf("password",v)} type={showPw?"text":"password"} req placeholder="••••••••"/>
         <button type="button" onClick={()=>setShowPw(x=>!x)} style={{background:"none",border:"none",color:C.textM,fontSize:11,cursor:"pointer",fontFamily:"Cairo",marginTop:-8,marginBottom:10}}>{showPw?"إخفاء كلمة المرور":"إظهار كلمة المرور"}</button>
-        <Sel label="الدور" value={f.role} onChange={v=>sf("role",v)} opts={[{v:"admin",l:"مدير النظام (صلاحيات كاملة)"},{v:"media_buyer",l:"Media Buyer"},{v:"social_media",l:"Social Media"},{v:"account_manager",l:"Account Manager"},{v:"designer",l:"Designer"}]} req/>
+        <Sel label="الدور" value={f.role} onChange={v=>sf("role",v)} opts={[{v:"admin",l:"مدير النظام (صلاحيات كاملة)"},{v:"media_buyer",l:"Media Buyer"},{v:"social_media",l:"Social Media"},{v:"account_manager",l:"Account Manager"},{v:"designer",l:"Designer"},{v:"viewer",l:"مشاهدة فقط (قراءة بدون تعديل)"}]} req/>
         {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#FCA5A5",fontSize:12}}>⚠️ {err}</div>}
         <div style={{display:"flex",gap:10}}>
           <Btn onClick={save} style={{flex:1,padding:13,opacity:saving?0.7:1}}>
@@ -3139,7 +3205,14 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
           {page==="overview"&&(
             <div>
               <div style={{color:C.text,fontSize:20,fontWeight:800,marginBottom:6}}>نظرة عامة على أدائك</div>
-              <div style={{color:C.textS,fontSize:13,marginBottom:24}}>جميع الأرقام منذ بداية التعامل · {clientData.platforms.join(" · ")}</div>
+              <div style={{color:C.textS,fontSize:13,marginBottom:24}}>جميع الأرقام منذ بداية التعامل · {(clientData.platforms||[]).join(" · ")}</div>
+              {clientData.live&&(clientData.live.days||[]).length+(clientData.live.campaigns||[]).length>0&&(
+                <Card s={{padding:"16px 18px",marginBottom:20}}>
+                  <div style={{color:C.text,fontSize:14,fontWeight:800,marginBottom:10}}>📊 نتائج الحملات (بتتحدث تلقائياً)</div>
+                  {(clientData.live.days||[]).slice(0,7).map((x,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:C.textS,padding:"4px 0",borderBottom:`1px solid ${C.border}`}}><span>{x.date}</span><span dir="ltr">{x.spend} {x.currency} · {x.purchases} شراء</span></div>)}
+                  {(clientData.live.campaigns||[]).slice(0,10).map((x,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:C.text,padding:"4px 0"}}><span>{x.name} <span style={{color:C.textM}}>({x.platform})</span></span><span dir="ltr">{x.spend_7d} {x.currency}</span></div>)}
+                </Card>
+              )}
 
               {/* Main KPIs */}
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:24}}>
@@ -3442,7 +3515,7 @@ function Login({onLogin}){
           if(!error&&data?.user){
             const {data:profile}=await window.__SB.from("users").select("id,email,name,role,avatar,avatar_url,is_active,auth_id,is_head_of").ilike("email",em).maybeSingle();
             if(profile&&profile.is_active!==false){
-              if(window.__loadFromDB)await window.__loadFromDB();
+              if(window.__loadFromDB)await window.__loadFromDB();if(window.__wmStartRT)window.__wmStartRT();
               onLogin({type:"team",...profile,avatar:profile.avatar||ini(profile.name),avatarUrl:profile.avatar_url,isHeadOf:profile.is_head_of});setLoading(false);return;
             }
             await window.__SB.auth.signOut();
@@ -3532,7 +3605,7 @@ function Login({onLogin}){
 // Helper: save to Supabase + localStorage fallback
 const SB = typeof window !== "undefined" && window.__SB;
 const save = async (table, data) => {
-  if(window.__SB) try { await window.__SB.from(table).insert(data); } catch(e) {}
+  if(window.__SB) try { const r = await window.__SB.from(table).insert(data); if(r.error) wmDbFail("الحفظ", r.error); } catch(e) {}
 };
 const wmDbFail = (what, error) => { try { window.alert("تعذر "+what+" في قاعدة البيانات، لم يتم الحفظ: "+(error&&error.message||"")); } catch(e) {} setTimeout(()=>window.location.reload(),50); };
 const update = async (table, data, match) => {
@@ -3611,13 +3684,23 @@ export default function App(){
     import("https://esm.sh/@supabase/supabase-js@2").then(({createClient}) => {
       window.__SB = createClient(url, key);
       window.__loadFromDB = loadFromDB;
+      const startRT=()=>{
+        if(window.__rt||!window.__SB)return;
+        let tm;const kick=()=>{clearTimeout(tm);tm=setTimeout(()=>{if(document.visibilityState!=="visible")return;loadFromDB();window.dispatchEvent(new Event("wm-refresh"));},700);};
+        const ch=window.__SB.channel("wm-live");
+        ["clients","users","follow_ups","tasks","campaigns","client_notes","satisfaction","ad_accounts","campaign_list","campaign_stats","daily_digest","audit_log","targets","notifications"].forEach(t=>ch.on("postgres_changes",{event:"*",schema:"public",table:t},kick));
+        ch.subscribe();window.__rt=ch;
+        setInterval(kick,60000);
+        document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")kick();});
+      };
+      window.__wmStartRT=startRT;
       window.__setPortalData = (d) => {
-        if(d?.client) setClientsRaw([{...d.client,mb:null,sm:null,am:null,pkg:d.client.pkg_amount,start:d.client.start_date,end:d.client.end_date,spend:d.client.total_spend}]);
+        if(d?.client) setClientsRaw([{...d.client,mb:null,sm:null,am:null,pkg:d.client.pkg_amount,start:d.client.start_date,end:d.client.end_date,spend:d.client.total_spend,platforms:d.client.platforms||[],live:d.live}]);
         if(d?.campaigns) setCampaignsRaw(d.campaigns.map(c=>({...c,clientId:c.client_id,week:c.week_start,purchaseValue:c.purchase_value})));
       };
       // Only load data when a real Supabase session exists; otherwise drop any stale local team login.
       window.__SB.auth.getSession().then(({data}) => {
-        if (data?.session) { loadFromDB(); }
+        if (data?.session) { loadFromDB(); startRT(); }
         else { setUserRaw(u => (u && u.type === "team") ? null : u); }
       });
     }).catch((err) => console.error("Failed to load supabase-js:", err));
@@ -3633,7 +3716,8 @@ export default function App(){
       if (data?.tasks) { setCreativeTasksRaw(data.tasks); ls.set("w_creative", data.tasks); }
     } catch(e) { console.error("Failed to load creative tasks from sheet:", e); }
   };
-  useEffect(() => { if (page === "creative") loadCreativeFromSheet(); }, [page]);
+  useEffect(() => { if (user?.type!=="client") return; const go=async()=>{try{const t=sessionStorage.getItem("w_portal_token");if(!t)return;const d=await fetch(`${PORTAL_API}/data`,{headers:{"x-portal-token":t,apikey:PORTAL_KEY}}).then(x=>x.json());if(d&&d.client&&window.__setPortalData)window.__setPortalData(d);}catch(e){}}; const iv=setInterval(go,60000); return ()=>clearInterval(iv); }, [user?.type]);
+  useEffect(() => { if (page !== "creative") return; loadCreativeFromSheet(); const iv=setInterval(()=>{if(document.visibilityState==="visible")loadCreativeFromSheet();},60000); return ()=>clearInterval(iv); }, [page]);
 
   // ─── MOTION MODULE — نفس الفكرة، الشيت هو قاعدة البيانات مباشرة ─────────────
   const MOTION_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/motion-sheet-api";
@@ -3645,7 +3729,7 @@ export default function App(){
       if (data?.tasks) { setMotionTasksRaw(data.tasks); ls.set("w_motion", data.tasks); }
     } catch(e) { console.error("Failed to load motion tasks from sheet:", e); }
   };
-  useEffect(() => { if (page === "motion") loadMotionFromSheet(); }, [page]);
+  useEffect(() => { if (page !== "motion") return; loadMotionFromSheet(); const iv=setInterval(()=>{if(document.visibilityState==="visible")loadMotionFromSheet();},60000); return ()=>clearInterval(iv); }, [page]);
 
   // ─── MEDIA RENEWALS — تاب شهري تلقائي جوه شيت التجديدات ─────────────────────
   const MEDIA_RENEWALS_API = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/media-renewals-sheet-api";
@@ -4084,6 +4168,9 @@ export default function App(){
     team: user.role === "admin" && !user.isHeadOf
       ? <TeamMgmt users={users} setUsers={setUsers}/>
       : <div style={{padding:32,color:C.red}}>غير مصرح</div>,
+    audit: user.role === "admin" && !user.isHeadOf
+      ? <AuditLog/>
+      : <div style={{padding:32,color:C.red}}>غير مصرح</div>,
   };
 
   return (
@@ -4093,6 +4180,7 @@ export default function App(){
       <button className="wm-hamburger" onClick={()=>setNavOpen(v=>!v)} aria-label="فتح القائمة">
         {navOpen ? "✕" : "☰"}
       </button>
+      {user?.role==="viewer"&&<div style={{position:"fixed",bottom:12,left:12,zIndex:9998,background:"#1E1B4B",border:"1px solid #7B6FE0",color:"#C7D2FE",padding:"6px 12px",borderRadius:10,fontSize:12,fontFamily:"Cairo"}}>👁 وضع المشاهدة فقط</div>}
       {loadErr&&<div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#7F1D1D",color:"#FEE2E2",padding:"10px 16px",display:"flex",gap:12,alignItems:"center",justifyContent:"center",fontSize:13,fontFamily:"Cairo"}}><span>⚠️ {loadErr}</span><button onClick={()=>loadFromDB()} style={{padding:"4px 12px",borderRadius:8,border:"1px solid #FCA5A5",background:"transparent",color:"#FEE2E2",cursor:"pointer",fontFamily:"Cairo"}}>إعادة المحاولة</button></div>}
       <Sidebar page={page} setPage={setPage} user={user} onLogout={() => setUser(null)} unread={unread}
         open={navOpen} onClose={()=>setNavOpen(false)}
