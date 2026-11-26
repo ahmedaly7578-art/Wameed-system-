@@ -3274,7 +3274,8 @@ export default function App(){
 
   // ─── STATE (localStorage as persistence) ──────────────────────────────────
   const [users, setUsersRaw] = useState(() => ls.get("w_users", IU));
-  const [clients, setClientsRaw] = useState(() => ls.get("w_clients", IC));
+  const [clients, setClientsRaw] = useState(() => ls.get("w_clients", []));
+  const [loadErr, setLoadErr] = useState("");
   const [followups, setFollowupsRaw] = useState(() => ls.get("w_followups", IFU));
   const [campaigns, setCampaignsRaw] = useState(() => ls.get("w_campaigns", ICAM));
   const [adAccounts, setAdAccountsRaw] = useState(() => ls.get("w_adAccounts", []));
@@ -3382,7 +3383,7 @@ export default function App(){
     if (!window.__SB) return;
     try {
       const [
-        {data:dU}, {data:dC}, {data:dF}, {data:dCa},
+        {data:dU,error:eU}, {data:dC,error:eC}, {data:dF}, {data:dCa},
         {data:dT}, {data:dS}, {data:dP}, {data:dAA}
       ] = await Promise.all([
         window.__SB.from("users").select("id,email,name,role,avatar,avatar_url,is_active,auth_id"),
@@ -3394,6 +3395,13 @@ export default function App(){
         window.__SB.from("payroll").select("*"),
         window.__SB.from("ad_accounts").select("id,account_id,account_name,business_name,platform,client_id,status,is_active,last_synced_at").in("platform",["Meta","Snapchat"]).order("account_name"),
       ]);
+      if(eC||eU){
+        console.error("DB load failed", eC?.code||eU?.code);
+        setLoadErr("تعذر تحميل بيانات العملاء من قاعدة البيانات. الأرقام المعروضة غير مكتملة. اضغط إعادة المحاولة.");
+        setClientsRaw([]);
+        return;
+      }
+      setLoadErr("");
       if(dU?.length) {
         const v=dU.map(u=>({...u,avatar:u.avatar||ini(u.name),avatarUrl:u.avatar_url,isHeadOf:u.is_head_of}));
         // الأدمن الأساسي (IU[0]) لازم يفضل موجود دايمًا حتى لو قاعدة البيانات
@@ -3411,7 +3419,7 @@ export default function App(){
       setAdAccountsRaw(dAA||[]); ls.set("w_adAccounts", dAA||[]);
       // creative_tasks بقى بيتقرا من الجوجل شيت مباشرة (loadCreativeFromSheet)، مش من هنا.
       setDbReady(true);
-    } catch(e) { console.log("DB error:", e); }
+    } catch(e) { console.log("DB error:", e); setLoadErr("تعذر الاتصال بقاعدة البيانات. اضغط إعادة المحاولة."); setClientsRaw([]); }
   };
 
   // ─── Meta OAuth callback ────────────────────────────────────────────────
@@ -3782,6 +3790,7 @@ export default function App(){
       <button className="wm-hamburger" onClick={()=>setNavOpen(v=>!v)} aria-label="فتح القائمة">
         {navOpen ? "✕" : "☰"}
       </button>
+      {loadErr&&<div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#7F1D1D",color:"#FEE2E2",padding:"10px 16px",display:"flex",gap:12,alignItems:"center",justifyContent:"center",fontSize:13,fontFamily:"Cairo"}}><span>⚠️ {loadErr}</span><button onClick={()=>loadFromDB()} style={{padding:"4px 12px",borderRadius:8,border:"1px solid #FCA5A5",background:"transparent",color:"#FEE2E2",cursor:"pointer",fontFamily:"Cairo"}}>إعادة المحاولة</button></div>}
       <Sidebar page={page} setPage={setPage} user={user} onLogout={() => setUser(null)} unread={unread}
         open={navOpen} onClose={()=>setNavOpen(false)}
         onAvatarSaved={(url)=>{
