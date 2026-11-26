@@ -906,7 +906,7 @@ function ClientNotes({client,notes,setNotes,users,onBack,currentUser}){
         {nErr&&<div style={{color:C.red,fontSize:12,marginBottom:8}}>{nErr}</div>}
         <Btn onClick={add} style={{width:"100%",padding:13}}>✓ حفظ</Btn>
       </Mdl>
-      <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",color:C.textS,cursor:"pointer",fontFamily:"Cairo",fontSize:13,marginBottom:14}}>← العودة</button>
+      <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,0.06)",border:`1px solid ${C.border}`,borderRadius:10,padding:"7px 14px",color:C.text,cursor:"pointer",fontFamily:"Cairo",fontSize:13,fontWeight:700,marginBottom:14}}>← العودة</button>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
         <div style={{color:C.text,fontSize:14,fontWeight:700}}>سجل التفاعلات — {client.name}</div>
         <Btn onClick={()=>setAddOpen(true)} style={{fontSize:12,padding:"8px 14px"}}>+ إضافة</Btn>
@@ -1138,7 +1138,7 @@ function ClientDetail({currentUser,c,users,onBack,notes,setNotes,satisfaction,ca
             </select></label>))}
         {asBusy&&<span style={{color:C.orange,fontSize:12}}>{asBusy}</span>}
       </div>}
-        <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",color:C.textS,cursor:"pointer",fontFamily:"Cairo",fontSize:13,marginBottom:14}}>← العملاء</button>
+        <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,0.06)",border:`1px solid ${C.border}`,borderRadius:10,padding:"7px 14px",color:C.text,cursor:"pointer",fontFamily:"Cairo",fontSize:13,fontWeight:700,marginBottom:14}}>← العملاء</button>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
           <div style={{display:"flex",alignItems:"center",gap:14}}>
             <div style={{width:50,height:50,borderRadius:13,background:`${C.purple}22`,border:`1.5px solid ${C.purple}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>🏪</div>
@@ -1579,6 +1579,9 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
   const [search,setSearch]=useState("");
   const [addOpen,setAddOpen]=useState(false);
   const [sel,setSel]=useState(null);
+  const openClient=(c)=>{try{window.history.pushState({wmClient:c.id},"");}catch(e){}setSel(c);};
+  const goBack=()=>{if(window.history.state&&window.history.state.wmClient)window.history.back();else setSel(null);};
+  useEffect(()=>{const h=()=>setSel(null);window.addEventListener("popstate",h);return()=>window.removeEventListener("popstate",h);},[]);
 
   // sync selected client when clients array changes
   useEffect(()=>{
@@ -1597,7 +1600,7 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
       currentUser={currentUser}
       c={sel}
       users={users||[]}
-      onBack={()=>setSel(null)}
+      onBack={goBack}
       notes={notes||[]}
       setNotes={setNotes}
       satisfaction={satisfaction||[]}
@@ -1654,7 +1657,7 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
                         <td style={{padding:"12px 14px"}}>{c.email?<Bdg label="✓ مفعّلة" color={C.green}/>:<span style={{color:C.textM,fontSize:11}}>—</span>}</td>
                         <td style={{padding:"12px 14px"}}>
                           <div style={{display:"flex",gap:6}}>
-                            <button onClick={()=>setSel(c)} style={{padding:"5px 12px",borderRadius:8,background:`${C.purple}18`,border:`1px solid ${C.purple}33`,color:C.purple,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>عرض</button>
+                            <button onClick={()=>openClient(c)} style={{padding:"5px 12px",borderRadius:8,background:`${C.purple}18`,border:`1px solid ${C.purple}33`,color:C.purple,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>عرض</button>
                             <button onClick={()=>{
                               const next=["active","hold","pending","cancelled"];
                               const cur=next.indexOf(c.status);
@@ -1784,7 +1787,7 @@ function ClientFU({client,users,followups,setFollowups,addNotif,currentUser,onBa
   return(
     <div>
       <div style={{padding:"24px 32px 0"}}>
-        <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",color:C.textS,cursor:"pointer",fontFamily:"Cairo",fontSize:13,marginBottom:14}}>← المتابعات</button>
+        <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,0.06)",border:`1px solid ${C.border}`,borderRadius:10,padding:"7px 14px",color:C.text,cursor:"pointer",fontFamily:"Cairo",fontSize:13,fontWeight:700,marginBottom:14}}>← المتابعات</button>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:22}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <div style={{width:48,height:48,borderRadius:12,background:`${C.teal}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📌</div>
