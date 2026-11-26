@@ -185,6 +185,7 @@ const NAV=[
   {id:"motion",icon:"🎬",label:"الموشن"},
   {id:"media-renewals",icon:"🔁",label:"تجديدات الميديا",mediaOnly:true},
   {id:"campaigns",icon:"📊",label:"الحملات"},
+  {id:"daily-report",icon:"🗓️",label:"التقرير اليومي"},
   {id:"ai",icon:"🤖",label:"AI تحليل"},
   {id:"tasks",icon:"✅",label:"المهام"},
   {id:"reports",icon:"📋",label:"التقارير"},
@@ -924,7 +925,7 @@ function AddClientModal({open,onClose,onAdd,users}){
   const mbs=users.filter(u=>u.role==="media_buyer");
   const sms=users.filter(u=>u.role==="social_media");
   const ams=users.filter(u=>u.role==="account_manager");
-  const E={name:"",pkg:"",mb:"",sm:"",am:"",platforms:[],status:"active",start:"",end:"",roas:"",spend:"",notes:"",email:"",password:""};
+  const E={company:"",name:"",pkg:"",mb:"",sm:"",am:"",platforms:[],status:"active",start:"",end:"",roas:"",spend:"",notes:"",email:"",password:""};
   const [f,setF]=useState(E);const [err,setErr]=useState("");const [step,setStep]=useState(1);
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const tp=(p)=>setF(prev=>({...prev,platforms:prev.platforms.includes(p)?prev.platforms.filter(x=>x!==p):[...prev.platforms,p]}));
@@ -986,6 +987,7 @@ function AddClientModal({open,onClose,onAdd,users}){
           <span style={{fontSize:18}}>🔑</span>
           <div style={{color:C.textS,fontSize:12,lineHeight:1.6}}>بيانات دخول بوابة العميل — العميل هيستخدمها يدخل يشوف نتائجه وتقاريره. لو مش عايز تفعّلها دلوقتي اتركها فاضية.</div>
         </div>
+        <Sel label="الشركة (تحدد شكل التقرير)" value={f.company} onChange={v=>s("company",v)} opts={COMPANIES} ph="لم تُحدد"/>
         <Inp label="البريد الإلكتروني للعميل" value={f.email} onChange={v=>s("email",v)} type="email" placeholder="client@email.com"/>
         <Inp label="كلمة المرور" value={f.password} onChange={v=>s("password",v)} placeholder="كلمة مرور قوية"/>
         {f.email&&f.password&&(
@@ -1004,7 +1006,7 @@ function AddClientModal({open,onClose,onAdd,users}){
   );
 }
 
-function ClientDetail({c,users,onBack,notes,setNotes,satisfaction,campaigns,setClients}){
+function ClientDetail({currentUser,c,users,onBack,notes,setNotes,satisfaction,campaigns,setClients}){
   const [tab,setTab]=useState("overview");
   const [credOpen,setCredOpen]=useState(false);
   const [credF,setCredF]=useState({email:c?.email||"",password:c?.password||""});
@@ -1035,10 +1037,24 @@ function ClientDetail({c,users,onBack,notes,setNotes,satisfaction,campaigns,setC
   };
   const copyText=(text,key)=>{navigator.clipboard?.writeText(text);setCopied(key);setTimeout(()=>setCopied(""),2000);};
 
+  const [coBusy,setCoBusy]=useState("");
+  const setCompany=async(v)=>{
+    setCoBusy("جاري الحفظ...");
+    try{const r=await wmAuthFetch(`${SNAP_DAILY_URL}?mode=set-company`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({clientId:c.id,company:v||null})});
+      if(r.ok){setClients(p=>p.map(x=>x.id===c.id?{...x,company:v||null}:x));setCoBusy("تم الحفظ");}else setCoBusy("تعذر الحفظ");}catch(e){setCoBusy("تعذر الحفظ");}
+    setTimeout(()=>setCoBusy(""),2500);
+  };
   const TABS=[["overview","عام"],["campaigns","الحملات"],["notes","السجل"],["portal","🔑 البوابة"],["renewal","الاشتراك"]];
 
   return(
     <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+        <span style={{color:C.textS,fontSize:12}}>الشركة:</span>
+        {currentUser?.role==="admin"
+          ? <select value={c.company||""} onChange={e=>setCompany(e.target.value)} style={{padding:"7px 12px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,fontFamily:"Cairo"}}><option value="">لم تُحدد</option>{COMPANIES.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select>
+          : <span style={{color:C.text,fontSize:13}}>{(COMPANIES.find(o=>o.v===c.company)||{}).l||"لم تُحدد"}</span>}
+        {coBusy&&<span style={{color:C.orange,fontSize:12}}>{coBusy}</span>}
+      </div>
       {/* Credentials Modal */}
       <Mdl open={credOpen} onClose={()=>setCredOpen(false)} title="🔑 بيانات دخول بوابة العميل" width={440}>
         <div style={{background:"rgba(123,111,224,0.08)",border:`1px solid ${C.purple}33`,borderRadius:12,padding:"12px 16px",marginBottom:16,fontSize:12,color:C.textS,lineHeight:1.6}}>
@@ -1246,7 +1262,155 @@ function ClientDetail({c,users,onBack,notes,setNotes,satisfaction,campaigns,setC
   );
 }
 
-function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns}){
+// ─── Daily client report (Snapchat) ──────────────────────────────────────────
+const SNAP_DAILY_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/snap-daily";
+const COMPANIES = [
+  {v:"wameed",l:"وميض Wameed"},
+  {v:"imdad",l:"إمداد Imdad"},
+  {v:"alfaisal",l:"الفيصل Al-Faisal"},
+];
+// Brand per company. Imdad has no approved assets yet: neutral draft on purpose.
+const BRANDS = {
+  wameed:{name:"وميض",en:"WAMEED",bg:"linear-gradient(135deg,#E879A0 0%,#7B6FE0 100%)",accent:"#FFFFFF",fg:"#FFFFFF"},
+  alfaisal:{name:"الفيصل",en:"AL-FAISAL",bg:"linear-gradient(135deg,#0B1437 0%,#2A2F7A 100%)",accent:"#D4AF37",fg:"#F5E6B3"},
+  imdad:{name:"إمداد",en:"IMDAD",bg:"linear-gradient(135deg,#374151 0%,#4B5563 100%)",accent:"#E5E7EB",fg:"#F3F4F6",draft:true},
+};
+const fmtN=(v,d=0)=>v===null||v===undefined||!isFinite(v)?"—":Number(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const ratio=(a,b,k=1)=>(a===null||a===undefined||b===null||b===undefined||!(b>0))?null:a/b*k;
+const num=(m,k)=>(m&&m[k]!==undefined&&m[k]!==null)?Number(m[k]):null;
+function sumKey(rows,k){let s=0,have=0;for(const r of rows){const v=num(r.metrics,k);if(v!==null){s+=v;have++;}}
+  if(have===0)return {v:null,note:null};
+  if(have<rows.length)return {v:null,note:`جزئي ${have}/${rows.length}`};
+  return {v:s,note:null};}
+function metricsFor(rows){
+  const g=(k)=>sumKey(rows,k);
+  const sp=g("spend"),im=g("impressions"),sw=g("swipes"),vv=g("video_views"),pu=g("conversion_purchases"),pv=g("conversion_purchases_value");
+  const R=(x,y,k,d,l)=>{const n=x.note||y.note;return [l,n?null:ratio(x.v,y.v,k),d,n];};
+  return [
+    ["الإنفاق",sp.v,2,sp.note],["مرات الظهور",im.v,0,im.note],["السحبات",sw.v,0,sw.note],["مشاهدات الفيديو",vv.v,0,vv.note],
+    R(sw,im,100,2,"CTR %"),R(sp,im,1000,2,"eCPM"),R(sp,sw,1,3,"تكلفة السحبة"),
+    ["المشتريات",pu.v,0,pu.note],["قيمة المشتريات",pv.v,2,pv.note],R(sp,pu,1,2,"تكلفة الشراء"),R(pv,sp,1,2,"ROAS"),
+  ];
+}
+function DailyReport({clients,currentUser}){
+  const isAdmin=currentUser?.role==="admin";
+  const mine=(clients||[]).filter(c=>c.status!=="cancelled"&&(isAdmin||[c.mb,c.sm,c.am].includes(currentUser?.id)));
+  const iso=(d)=>d.toISOString().slice(0,10);
+  const [cid,setCid]=useState("");
+  const [from,setFrom]=useState(iso(new Date(Date.now()-3*86400000)));
+  const [to,setTo]=useState(iso(new Date(Date.now()-86400000)));
+  const [data,setData]=useState(null);const [err,setErr]=useState("");const [busy,setBusy]=useState(false);
+  const [msg,setMsg]=useState("");
+  const ref=useRef(null);
+  const load=async()=>{
+    if(!cid)return;setBusy(true);setErr("");setData(null);
+    try{
+      const r=await wmAuthFetch(`${SNAP_DAILY_URL}?mode=report&clientId=${cid}&from=${from}&to=${to}`);
+      const j=await r.json();
+      if(!r.ok)setErr(r.status===403?"ليس لديك صلاحية على هذا العميل":"تعذر تحميل التقرير");else setData(j);
+    }catch(e){setErr("تعذر تحميل التقرير");}
+    setBusy(false);
+  };
+  useEffect(()=>{load();},[cid,from,to]);
+  const refresh=async()=>{
+    setMsg("جاري التحديث...");
+    try{const r=await wmAuthFetch(`${SNAP_DAILY_URL}?mode=refresh-accounts`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});const j=await r.json();
+      setMsg(r.ok?`تم: ${j.accounts_seen} حساب، ${j.new_accounts} جديد${j.errors?.length?` — أخطاء: ${j.errors.length}`:""}`:"تعذر التحديث");}catch(e){setMsg("تعذر التحديث");}
+  };
+  const exportPng=async()=>{
+    if(!ref.current)return;setMsg("جاري التصدير...");
+    try{
+      const {default:h2c}=await import(/* @vite-ignore */ "https://esm.sh/html2canvas@1.4.1");
+      const cv=await h2c(ref.current,{backgroundColor:null,scale:2});
+      const a=document.createElement("a");a.download=`daily-report-${data?.client?.name||"client"}-${to}.png`;a.href=cv.toDataURL("image/png");a.click();setMsg("");
+    }catch(e){setMsg("تعذر التصدير");}
+  };
+  const company=data?.client?.company||null;
+  const B=company?BRANDS[company]:null;
+  const accounts=data?.accounts||[];
+  const byCur={};
+  accounts.forEach(a=>{const cur=a.currency||"—";(byCur[cur]=byCur[cur]||[]).push(...a.rows.map(r=>({...r,cur})));});
+  const allRows=accounts.flatMap(a=>a.rows);
+  const fetched=allRows.map(r=>r.fetched_at).filter(Boolean).sort().pop();
+  const anyPrelim=allRows.some(r=>!r.final);
+  const days=[...new Set(allRows.map(r=>r.stat_date))].sort();
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:6}}>
+        <div style={{color:C.text,fontSize:20,fontWeight:800}}>التقرير اليومي</div>
+        {isAdmin&&<button onClick={refresh} style={{padding:"8px 14px",background:`${C.purple}22`,border:`1px solid ${C.purple}44`,borderRadius:10,color:C.purple,fontFamily:"Cairo",fontSize:12,cursor:"pointer"}}>🔄 تحديث الحسابات من سناب</button>}
+      </div>
+      <div style={{color:C.textS,fontSize:13,marginBottom:18}}>أرقام سناب شات اليومية لكل عميل — بتتحدث تلقائياً الساعة 8:30 صباحاً بتوقيت القاهرة</div>
+      {msg&&<div style={{color:C.orange,fontSize:12,marginBottom:10}}>{msg}</div>}
+      <Card s={{marginBottom:16}}>
+        <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:12}}>
+          <Sel label="العميل" value={cid} onChange={setCid} opts={mine.map(c=>({v:c.id,l:c.name}))} ph="اختر عميل" mb={0}/>
+          <Inp label="من" value={from} onChange={setFrom} type="date" mb={0}/>
+          <Inp label="إلى" value={to} onChange={setTo} type="date" mb={0}/>
+        </div>
+      </Card>
+      {busy&&<div style={{color:C.textS,fontSize:13}}>جاري التحميل...</div>}
+      {err&&<div style={{color:C.red,fontSize:13}}>{err}</div>}
+      {data&&(
+        <div>
+          <div ref={ref} style={{borderRadius:18,overflow:"hidden",border:`1px solid ${C.border}`,background:"#0D1526"}}>
+            <div style={{background:B?B.bg:"#1F2937",padding:"20px 24px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{color:B?B.fg:"#F3F4F6",fontSize:22,fontWeight:900,}}>{B?B.name:"—"} <span style={{fontSize:12,letterSpacing:4,color:B?B.accent:"#9CA3AF",fontWeight:700}}>{B?B.en:"NO COMPANY SET"}</span></div>
+                {B?.draft&&<div style={{color:"#FDE68A",fontSize:11,marginTop:4}}>مسودة — هوية إمداد لسه مش معتمدة</div>}
+                {!B&&<div style={{color:"#FDE68A",fontSize:11,marginTop:4}}>الشركة لم تُحدد لهذا العميل — اختارها من صفحة العميل</div>}
+              </div>
+              <div style={{textAlign:"left"}}>
+                <div style={{color:B?B.fg:"#F3F4F6",fontSize:15,fontWeight:800}}>{data.client.name}</div>
+                <div style={{color:B?B.accent:"#9CA3AF",fontSize:11,marginTop:2}}>{days.length?`من ${days[0]} إلى ${days[days.length-1]}`:`من ${from} إلى ${to}`}</div>
+              </div>
+            </div>
+            <div style={{padding:"18px 24px"}}>
+              {accounts.length===0&&<div style={{color:C.textS,fontSize:13}}>لا توجد حسابات سناب مربوطة بهذا العميل بعد (اربطها من الحملات ← الحسابات).</div>}
+              {accounts.length>0&&allRows.length===0&&<div style={{color:C.textS,fontSize:13}}>لا توجد أرقام محفوظة لهذه الفترة بعد.</div>}
+              {Object.entries(byCur).map(([cur,rows])=>(
+                <div key={cur} style={{marginBottom:18}}>
+                  <div style={{color:C.text,fontSize:13,fontWeight:800,marginBottom:8}}>إجمالي بعملة {cur}</div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8}}>
+                    {metricsFor(rows).map(([l,v,d,n])=>(
+                      <div key={l} style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px"}}>
+                        <div style={{color:C.textS,fontSize:11}}>{l}</div>
+                        <div style={{color:C.text,fontSize:16,fontWeight:800,direction:"ltr",textAlign:"right"}}>{fmtN(v,d)}</div>{n&&<div style={{color:C.orange,fontSize:10,marginTop:2}}>{n}</div>}
+                      </div>))}
+                  </div>
+                </div>
+              ))}
+              {accounts.filter(a=>a.rows.length).map(a=>(
+                <div key={a.id} style={{marginBottom:14}}>
+                  <div style={{color:"rgba(255,255,255,0.75)",fontSize:12,marginBottom:6}}>{a.name} · {a.currency||"—"} · {a.timezone||"—"}</div>
+                  <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                    <thead><tr style={{color:"rgba(255,255,255,0.7)",textAlign:"right"}}>{["التاريخ","الحملة","الإنفاق","الظهور","السحبات","CTR %","المشتريات","قيمة المشتريات","ROAS","الحالة"].map(h=><th key={h} style={{padding:"6px 8px",borderBottom:`1px solid ${C.border}`,fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+                    <tbody>{a.rows.slice().sort((x,y)=>x.stat_date<y.stat_date?1:-1).map((r,i)=>{
+                      const sp=num(r.metrics,"spend"),im=num(r.metrics,"impressions"),sw=num(r.metrics,"swipes"),pu=num(r.metrics,"conversion_purchases"),pv=num(r.metrics,"conversion_purchases_value");
+                      const td={padding:"6px 8px",direction:"ltr",textAlign:"right"};
+                      return <tr key={i} style={{color:C.text}}>
+                        <td style={td}>{r.stat_date}</td><td style={{padding:"6px 8px"}}>{r.campaign_name||r.campaign_id}</td>
+                        <td style={td}>{fmtN(sp,2)}</td><td style={td}>{fmtN(im)}</td><td style={td}>{fmtN(sw)}</td>
+                        <td style={td}>{fmtN(ratio(sw,im,100),2)}</td>
+                        <td style={td}>{fmtN(pu)}</td><td style={td}>{fmtN(pv,2)}</td><td style={td}>{fmtN(ratio(pv,sp),2)}</td>
+                        <td style={{padding:"6px 8px",color:r.final?C.green:C.orange,whiteSpace:"nowrap"}}>{r.final?"نهائي":"أولي"}</td></tr>;})}</tbody>
+                  </table></div>
+                </div>
+              ))}
+              <div style={{color:"rgba(255,255,255,0.78)",fontSize:13,lineHeight:1.8,marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+                {anyPrelim?"⚠️ أرقام أولية: سناب بتثبّت الأرقام بعد 48 ساعة من نهاية اليوم. ":""}
+                آخر جلب: {fetched?new Date(fetched).toLocaleString("ar-EG",{timeZone:"Africa/Cairo"}):"—"} (توقيت القاهرة). الإجماليات منفصلة لكل عملة. "—" يعني الرقم غير متاح من سناب، و"جزئي" يعني بعض الحملات ناقصة فلا يتم عرض إجمالي كامل.
+              </div>
+            </div>
+          </div>
+          <div style={{marginTop:12}}><Btn onClick={exportPng}>⬇️ تصدير كصورة</Btn></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns,currentUser}){
   const [filter,setFilter]=useState("all");
   const [search,setSearch]=useState("");
   const [addOpen,setAddOpen]=useState(false);
@@ -1266,6 +1430,7 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
 
   if(sel) return(
     <ClientDetail
+      currentUser={currentUser}
       c={sel}
       users={users||[]}
       onBack={()=>setSel(null)}
@@ -3222,7 +3387,7 @@ export default function App(){
         {data:dT}, {data:dS}, {data:dP}, {data:dAA}
       ] = await Promise.all([
         window.__SB.from("users").select("id,email,name,role,avatar,avatar_url,is_active,auth_id"),
-        window.__SB.from("clients").select("id,name,email,pkg_amount,platforms,status,mb_id,sm_id,am_id,start_date,end_date,roas,total_spend,notes,cancel_reason,cancel_date,created_at,updated_at"),
+        window.__SB.from("clients").select("id,name,email,pkg_amount,platforms,status,company,mb_id,sm_id,am_id,start_date,end_date,roas,total_spend,notes,cancel_reason,cancel_date,created_at,updated_at"),
         window.__SB.from("follow_ups").select("*").order("created_at",{ascending:false}),
         window.__SB.from("campaigns").select("*").order("week_start",{ascending:false}),
         window.__SB.from("tasks").select("*"),
@@ -3376,14 +3541,14 @@ export default function App(){
   const unread = notifs.filter(n => (!n.userId || n.userId === user?.id) && !n.read).length;
   const P = {
     dashboard: <Dashboard clients={clients} users={users} notifs={notifs} followups={followups} tasks={tasks} currentUser={user}/>,
-    clients: <Clients
+    clients: <Clients currentUser={user}
       clients={clients}
       setClients={(fn) => {
         const prev = clients;
         const next = typeof fn === "function" ? fn(prev) : fn;
         if (next.length > prev.length) {
           const cl = next[next.length-1];
-          save("clients", {name:cl.name,email:cl.email,password:cl.password,pkg_amount:cl.pkg,platforms:cl.platforms,status:cl.status,mb_id:cl.mb,sm_id:cl.sm,am_id:cl.am,start_date:cl.start,end_date:cl.end,roas:cl.roas,total_spend:cl.spend,notes:cl.notes});
+          save("clients", {name:cl.name,email:cl.email,password:cl.password,pkg_amount:cl.pkg,platforms:cl.platforms,status:cl.status,mb_id:cl.mb,sm_id:cl.sm,am_id:cl.am,start_date:cl.start,end_date:cl.end,roas:cl.roas,total_spend:cl.spend,notes:cl.notes,company:cl.company||null});
         } else if (next.length < prev.length) {
           const removed = prev.find(c => !next.find(x => x.id === c.id));
           if (removed) del("clients", {id: removed.id});
@@ -3577,6 +3742,7 @@ export default function App(){
       }}
       clients={clients} users={users} currentUser={user}
     />,
+    "daily-report": <DailyReport clients={clients} currentUser={user}/>,
     reports: <Reports clients={clients} campaigns={campaigns} users={users}/>,
     churn: <ChurnTracker clients={clients} users={users}/>,
     targets: <Targets clients={clients} campaigns={campaigns} users={users} targets={targets} setTargets={setTargets}/>,
