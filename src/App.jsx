@@ -1399,15 +1399,27 @@ function DailyReport({clients,currentUser}){
   const B=company?BRANDS[company]:null;
   const spanDays=Math.round((new Date(to)-new Date(from))/86400000)+1;
   const periodLabel=spanDays>=28?"Monthly report":spanDays>=6?"Weekly report":"Daily report";
-  const fetchPeriod=async()=>{
+  const fetchPeriod=async(full)=>{
     if(!data?.accounts?.length){setMsg("No Snapchat account is linked to this client");return;}
-    const days=Math.min(31,Math.max(1,Math.ceil((Date.now()-Date.parse(from))/86400000)+1));
-    let ok=0,bad=0;
+    let ok=0,bad=0,rows=0;
     for(let i=0;i<data.accounts.length;i++){
-      setMsg(`Fetching from Snapchat... account ${i+1} of ${data.accounts.length}`);
-      try{const r=await wmAuthFetch(`${SNAP_DAILY_URL}?mode=sync&accountId=${data.accounts[i].id}&days=${days}`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});if(r.ok)ok++;else bad++;}catch(e){bad++;}
+      let endAgo=0,created=null;
+      for(let k=0;k<130;k++){
+        setMsg(`Fetching from Snapchat... account ${i+1} of ${data.accounts.length}, ${endAgo} days back`);
+        let j=null;
+        try{const r=await wmAuthFetch(`${SNAP_DAILY_URL}?mode=sync&accountId=${data.accounts[i].id}&days=31&endAgo=${endAgo}`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});if(r.ok)j=await r.json();}catch(e){}
+        if(!j||j.ok===false){bad++;break;}
+        if(j.skipped){await new Promise(r=>setTimeout(r,4000));continue;}
+        rows+=j.rows||0;if(j.created_at)created=String(j.created_at).slice(0,10);
+        const chunkFrom=j.from;
+        if(!chunkFrom){ok++;break;}
+        if(!full&&chunkFrom<=from){ok++;break;}
+        if(full&&created&&chunkFrom<=created){ok++;break;}
+        if(full&&!created&&chunkFrom<="2013-01-01"){ok++;break;}
+        endAgo+=31;
+      }
     }
-    setMsg(bad?`Fetched ${ok} account(s), ${bad} failed`:`Fetched ${ok} account(s). Snapchat only keeps recent days, up to 31 back.`);
+    setMsg(bad?`Fetched ${ok} account(s), ${bad} failed (${rows} rows saved)`:`Done: ${ok} account(s), ${rows} daily rows saved.`);
     load();
   };
   const preset=(n)=>{setTo(iso(new Date(Date.now()-86400000)));setFrom(iso(new Date(Date.now()-n*86400000)));};
@@ -1477,7 +1489,7 @@ function DailyReport({clients,currentUser}){
             <option value="">Not set (neutral report)</option>{COMPANIES.map(o=><option key={o.v} value={o.v}>{o.v==="wameed"?"Wameed":o.v==="alfaisal"?"Al-Faisal":o.v==="imdad"?"Imdad":o.l}</option>)}
           </select>
         </div>}
-        <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap",direction:"ltr"}}><Btn onClick={()=>preset(1)}>Yesterday</Btn><Btn onClick={()=>preset(7)}>Last 7 days (weekly)</Btn><Btn onClick={()=>preset(30)}>Last 30 days (monthly)</Btn>{isAdmin&&cid&&<Btn onClick={fetchPeriod}>⬇ Fetch this period from Snapchat</Btn>}</div>
+        <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap",direction:"ltr"}}><Btn onClick={()=>preset(1)}>Yesterday</Btn><Btn onClick={()=>preset(7)}>Last 7 days (weekly)</Btn><Btn onClick={()=>preset(30)}>Last 30 days (monthly)</Btn>{isAdmin&&cid&&<Btn onClick={()=>fetchPeriod(false)}>⬇ Fetch this period from Snapchat</Btn>}{isAdmin&&cid&&<Btn onClick={()=>{if(window.confirm("Fetch the full history since the ad account was created? This can take a few minutes."))fetchPeriod(true);}}>⏪ Fetch full history</Btn>}</div>
       </Card>
       {busy&&<div style={{color:C.textS,fontSize:13}}>Loading...</div>}
       {err&&<div style={{color:C.red,fontSize:13}}>{err}</div>}
@@ -2819,6 +2831,15 @@ function TeamMgmt({users,setUsers}){
         <Btn onClick={()=>{setF({name:"",role:"media_buyer",email:"",password:""});setErr("");setEdit(null);setOpen(true)}}>+ إضافة</Btn>
       </TB>
       <div className="wm-page" style={{padding:"0 32px"}}>
+        {users.filter(u=>u.is_active===false&&u.role!=="admin"&&u.auth_id).length>0&&<Card s={{marginBottom:20}}>
+          <div style={{color:C.orange,fontSize:14,fontWeight:700,marginBottom:10,direction:"ltr"}}>Pending approval (signed up with the link)</div>
+          {users.filter(u=>u.is_active===false&&u.role!=="admin"&&u.auth_id).map(u=>(
+            <div key={u.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:`1px solid ${C.border}`,direction:"ltr",flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:160,color:C.text,fontSize:13}}>{u.name} <span style={{color:C.textM}}>· {RL[u.role]||u.role} · {u.email}</span></div>
+              <Btn onClick={async()=>{const r=await wmAuthFetch(SNAP_DAILY_URL.replace("snap-daily","staff-signup")+"?mode=approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId:u.id})});if(r.ok){setUsers(p=>p.map(x=>x.id===u.id?{...x,is_active:true}:x));}else window.alert("Could not approve");}}>Approve</Btn>
+              <button onClick={async()=>{if(!window.confirm("Reject and delete this sign-up?"))return;const r=await wmAuthFetch(SNAP_DAILY_URL.replace("snap-daily","staff-signup")+"?mode=reject",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId:u.id})});if(r.ok){setUsers(p=>p.filter(x=>x.id!==u.id));}else window.alert("Could not reject");}} style={{padding:"8px 14px",borderRadius:10,background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,color:C.textS,fontSize:12,fontFamily:"Cairo",cursor:"pointer"}}>Reject</button>
+            </div>))}
+        </Card>}
         {[["admin","مديرو النظام","👑"],["media_buyer","Media Buyers","📊"],["social_media","Social Media","📱"],["account_manager","Account Managers","📋"],["designer","Designers","🎨"]].map(([role,label,icon])=>(
           <div key={role} style={{marginBottom:24}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}><span style={{fontSize:16}}>{icon}</span><div style={{color:C.textS,fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</div><Bdg label={`${users.filter(u=>u.role===role).length}`} color={RC[role]}/></div>
@@ -3297,6 +3318,50 @@ function ClientPortal({clientData, campaigns, users, onLogout, satisfaction, set
 const PORTAL_API="https://jokdohhukkbrergfauwc.supabase.co/functions/v1/client-portal";
 const PORTAL_KEY="sb_publishable_DkwiFcNG0im57wftL-lATw_l4Z1TCvs";
 // ═══ LOGIN ════════════════════════════════════════════════════════════════════
+
+// ═══ STAFF SELF-SIGNUP (pending admin approval) ═════════════════════════════
+function JoinPage(){
+  const code=(window.location.hash.match(/[?&]c=([A-Za-z0-9]+)/)||[])[1]||"";
+  const [f,setF]=useState({name:"",role:"media_buyer",email:"",password:"",confirm:""});
+  const [show,setShow]=useState(false);const [busy,setBusy]=useState(false);const [err,setErr]=useState("");const [done,setDone]=useState(false);
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const inp={width:"100%",padding:"12px 14px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:14,outline:"none",fontFamily:"Cairo",boxSizing:"border-box",direction:"ltr"};
+  const submit=async()=>{
+    setErr("");
+    if(!f.name.trim()||!f.email.trim()||!f.password){setErr("Please fill every field.");return;}
+    if(f.password.length<8){setErr("Password must be at least 8 characters.");return;}
+    if(f.password!==f.confirm){setErr("The two passwords do not match.");return;}
+    setBusy(true);
+    try{
+      const r=await fetch(`${SNAP_DAILY_URL.replace("snap-daily","staff-signup")}?mode=join`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:f.name,email:f.email,password:f.password,role:f.role,code})});
+      const j=await r.json().catch(()=>({}));
+      if(r.ok&&j.ok)setDone(true);
+      else setErr(j.error==="email_exists"?"This email already has an account.":j.error==="bad_code"?"This link is not valid. Ask for a new one.":"Could not create the account. Check the details and try again.");
+    }catch(e){setErr("Network problem. Try again.");}
+    setBusy(false);
+  };
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"Cairo"}}>
+      <div style={{width:"100%",maxWidth:440,background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:18,padding:28}}>
+        <div style={{textAlign:"center",marginBottom:20}}><div style={{fontSize:26,fontWeight:800,color:C.text}}>وميض WAMEED</div><div style={{color:C.textS,fontSize:13,marginTop:4}}>Create your team account</div></div>
+        {done?<div style={{textAlign:"center",color:C.text,fontSize:14,lineHeight:1.8}}><div style={{fontSize:36}}>✅</div>Account created. It will work as soon as the admin approves it.<br/>تم إنشاء الحساب. هيشتغل أول ما الأدمن يوافق عليه.</div>:<>
+        <div style={{display:"grid",gap:12}}>
+          <div><div style={{color:C.textS,fontSize:12,marginBottom:6}}>Full name / الاسم</div><input value={f.name} onChange={e=>s("name",e.target.value)} style={inp}/></div>
+          <div><div style={{color:C.textS,fontSize:12,marginBottom:6}}>Level / role / المستوى</div>
+            <select value={f.role} onChange={e=>s("role",e.target.value)} style={inp}>
+              <option value="media_buyer">Media Buyer</option><option value="social_media">Social Media</option><option value="account_manager">Account Manager</option><option value="designer">Designer</option>
+            </select></div>
+          <div><div style={{color:C.textS,fontSize:12,marginBottom:6}}>Email / الإيميل</div><input type="email" value={f.email} onChange={e=>s("email",e.target.value)} style={inp}/></div>
+          <div><div style={{color:C.textS,fontSize:12,marginBottom:6}}>Password (8+ characters) / الباسورد</div><input type={show?"text":"password"} value={f.password} onChange={e=>s("password",e.target.value)} style={inp}/></div>
+          <div><div style={{color:C.textS,fontSize:12,marginBottom:6}}>Confirm password</div><input type={show?"text":"password"} value={f.confirm} onChange={e=>s("confirm",e.target.value)} style={inp}/></div>
+          <label style={{color:C.textS,fontSize:12,cursor:"pointer"}}><input type="checkbox" checked={show} onChange={e=>setShow(e.target.checked)}/> Show password</label>
+          {err&&<div style={{color:C.pink,fontSize:13}}>{err}</div>}
+          <button onClick={submit} disabled={busy} style={{padding:"13px",borderRadius:12,border:"none",background:`linear-gradient(135deg,${C.pink},${C.purple})`,color:"white",fontSize:15,fontWeight:700,fontFamily:"Cairo",cursor:"pointer",opacity:busy?0.6:1}}>{busy?"Creating...":"Create account"}</button>
+          <div style={{color:C.textM,fontSize:11,textAlign:"center"}}>Your account is reviewed by the admin before you can sign in. You only see the clients assigned to you.</div>
+        </div></>}
+      </div>
+    </div>);
+}
 function Login({onLogin}){
   const [em,setEm]=useState("");const [pw,setPw]=useState("");const [show,setShow]=useState(false);
   const [loading,setLoading]=useState(false);const [err,setErr]=useState("");const [foc,setFoc]=useState(null);
@@ -3683,6 +3748,7 @@ export default function App(){
   }, [motionTasks]);
 
   // ─── ROUTING ──────────────────────────────────────────────────────────────
+  if (/^#\/?join/.test(window.location.hash)) return <JoinPage />;
   if (!user) return <Login onLogin={u => { setUser(u); setPage("dashboard"); }} />;
 
   if (user.type === "client") {
@@ -3718,6 +3784,14 @@ export default function App(){
         } else if (next.length < prev.length) {
           const removed = prev.find(c => !next.find(x => x.id === c.id));
           if (removed) del("clients", {id: removed.id});
+        } else {
+          const MAP={email:"email",password:"password",pkg:"pkg_amount",platforms:"platforms",status:"status",mb:"mb_id",sm:"sm_id",am:"am_id",start:"start_date",end:"end_date",roas:"roas",spend:"total_spend",notes:"notes",cancelReason:"cancel_reason",cancelDate:"cancel_date",name:"name"};
+          for (const n of next) {
+            const o = prev.find(x => x.id === n.id); if (!o || o === n) continue;
+            const patch = {};
+            for (const k of Object.keys(MAP)) { if (k in n && JSON.stringify(n[k]) !== JSON.stringify(o[k])) patch[MAP[k]] = (n[k] === "" ? null : n[k]); }
+            if (Object.keys(patch).length && typeof n.id === "string") update("clients", patch, {id: n.id});
+          }
         }
         setClients(next);
       }}
