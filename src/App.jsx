@@ -198,6 +198,8 @@ const NAV=[
   {id:"media-renewals",icon:"🔁",label:"تجديدات الميديا",mediaOnly:true},
   {id:"campaigns",icon:"📊",label:"الحملات"},
   {id:"daily-report",icon:"🗓️",label:"التقرير اليومي"},
+  {id:"google-ads",icon:"🔎",label:"Google Ads",admin:true},
+  {id:"analytics",icon:"📈",label:"Analytics",admin:true},
   {id:"ai",icon:"🤖",label:"AI تحليل"},
   {id:"tasks",icon:"✅",label:"المهام"},
   {id:"reports",icon:"📋",label:"التقارير"},
@@ -1441,6 +1443,105 @@ function metricGroups(rows){
     {t:"Conversions",items:[V("Page views",pg),V("Add to cart",ac),V("Purchases",pu),V("Revenue",pv,2),R("ROAS",pv,sp,1,2,"x"),R("Cost per purchase",sp,pu,1,2),R("Cost per add to cart",sp,ac,1,2),R("Avg order value",pv,pu,1,2),R("Purchase rate (per swipe)",pu,sw,100,2,"%")]},
   ];
 }
+const GOOGLE_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/google-oauth";
+const GA_TABS=[["overview_by_day","Overview by day"],["channels","Channels"],["source_medium","Source / medium"],["campaigns","Campaigns"],["pages","Pages"],["landing_pages","Landing pages"],["countries","Countries"],["cities","Cities"],["devices","Devices"],["browsers","Browsers"],["events","Events"],["key_events","Key events"],["demographics","Age and gender"],["languages","Languages"],["ecommerce_items","E-commerce items"]];
+const gNum=(v,d=0)=>Number(v||0).toLocaleString("en-US",{maximumFractionDigits:d,minimumFractionDigits:d});
+const gLabel=(s)=>String(s).replace(/([A-Z])/g," $1").replace(/^./,x=>x.toUpperCase());
+function GoogleReports({kind,clients,currentUser}){
+  const isAds=kind==="ads";
+  const iso=(d)=>d.toISOString().slice(0,10);
+  const [st,setSt]=useState(null);const [msg,setMsg]=useState("");const [busy,setBusy]=useState(false);
+  const [cid,setCid]=useState("");const [from,setFrom]=useState(iso(new Date(Date.now()-7*86400000)));const [to,setTo]=useState(iso(new Date(Date.now()-86400000)));
+  const [data,setData]=useState(null);const [err,setErr]=useState("");const [tab,setTab]=useState("overview_by_day");
+  const loadStatus=async()=>{try{const r=await wmAuthFetch(`${GOOGLE_URL}?mode=status`);if(r.ok)setSt(await r.json());}catch(e){}};
+  useEffect(()=>{loadStatus();const p=new URLSearchParams(location.search).get("google");if(p){setMsg(p==="connected"?"Google connected. Press Find accounts.":p==="denied"?"Google sign-in was cancelled.":p==="no_refresh"?"Google did not return a long-lived token. Try Connect again.":"Could not verify the sign-in. Try again.");history.replaceState(null,"",location.pathname);}},[]);
+  const connect=async()=>{setMsg("Opening Google...");try{const r=await wmAuthFetch(`${GOOGLE_URL}?mode=start`);const j=await r.json();if(j.url)location.href=j.url;else setMsg("Could not start the connection");}catch(e){setMsg("Could not start the connection");}};
+  const discover=async()=>{setMsg("Finding accounts...");setBusy(true);try{const r=await wmAuthFetch(`${GOOGLE_URL}?mode=discover`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});const j=await r.json();if(!r.ok)setMsg(j.error==="expired"?"The Google connection expired. Press Connect Google again.":j.error==="not_connected"?"Connect Google first.":"Could not fetch accounts");else setMsg(`Found ${j.ads_accounts} Google Ads accounts and ${j.ga_properties} Analytics properties${j.errors?.length?` (${j.errors.length} issues)`:""}`);await loadStatus();}catch(e){setMsg("Could not fetch accounts");}setBusy(false);};
+  const link=async(k,id,clientId)=>{try{await wmAuthFetch(`${GOOGLE_URL}?mode=link`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind:k,id,clientId:clientId||null})});await loadStatus();}catch(e){}};
+  const load=async()=>{
+    if(!cid)return;setBusy(true);setErr("");setData(null);
+    try{const r=await wmAuthFetch(`${GOOGLE_URL}?mode=${isAds?"ads-report":"ga-report"}&clientId=${cid}&from=${from}&to=${to}`);const j=await r.json();
+      if(!r.ok)setErr(j.error==="expired"?"The Google connection expired. Press Connect Google again.":j.error==="not_connected"?"Connect Google first.":"Could not load the report");else setData(j);}catch(e){setErr("Could not load the report");}
+    setBusy(false);
+  };
+  useEffect(()=>{load();},[cid,from,to]);
+  const preset=(n)=>{setTo(iso(new Date(Date.now()-86400000)));setFrom(iso(new Date(Date.now()-n*86400000)));};
+  const conn=st?.connection;const items=isAds?(st?.ads||[]):(st?.ga||[]);
+  const linkedClientIds=new Set(items.map(x=>x.client_id).filter(Boolean));
+  const opts=(clients||[]).filter(c=>c.status!=="cancelled"&&(linkedClientIds.size===0||linkedClientIds.has(c.id))).map(c=>({v:c.id,l:c.name}));
+  const th={textAlign:"left",padding:"8px 10px",color:C.textS,fontSize:11,borderBottom:`1px solid ${C.border}`,whiteSpace:"nowrap"};
+  const td={padding:"8px 10px",fontSize:12,color:C.text,borderBottom:`1px solid ${C.border}22`};
+  const Stat=({l,v})=>(<div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 14px"}}><div style={{color:C.textS,fontSize:11}}>{l}</div><div style={{color:C.text,fontSize:20,fontWeight:800,marginTop:4}}>{v}</div></div>);
+  const adsView=()=>(data?.accounts||[]).map((a,i)=>{
+    const rows=a.rows||[];const cur=a.account?.currency||"";
+    const tot=rows.reduce((s,r)=>({cost:s.cost+r.cost,imp:s.imp+r.impressions,clk:s.clk+r.clicks,conv:s.conv+r.conversions,val:s.val+r.value}),{cost:0,imp:0,clk:0,conv:0,val:0});
+    const byC={};rows.forEach(r=>{const k=r.id;const x=byC[k]||(byC[k]={name:r.name,status:r.status,cost:0,imp:0,clk:0,conv:0,val:0});x.cost+=r.cost;x.imp+=r.impressions;x.clk+=r.clicks;x.conv+=r.conversions;x.val+=r.value;});
+    const camps=Object.values(byC).sort((x,y)=>y.cost-x.cost);
+    const byD={};rows.forEach(r=>{const x=byD[r.date]||(byD[r.date]={cost:0,imp:0,clk:0,conv:0});x.cost+=r.cost;x.imp+=r.impressions;x.clk+=r.clicks;x.conv+=r.conversions;});
+    const days=Object.keys(byD).sort();
+    return(<Card key={i} s={{marginBottom:16}}>
+      <div style={{color:C.text,fontWeight:800,fontSize:15,marginBottom:10,direction:"ltr"}}>{a.account?.name||a.account?.customer_id} <span style={{color:C.textS,fontSize:12,fontWeight:400}}>({a.account?.customer_id} {cur})</span></div>
+      {a.error?<div style={{color:C.orange,fontSize:12}}>Could not read this account: {a.error}</div>:<div style={{direction:"ltr"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
+          <Stat l={`Spend (${cur})`} v={gNum(tot.cost,2)}/><Stat l="Impressions" v={gNum(tot.imp)}/><Stat l="Clicks" v={gNum(tot.clk)}/><Stat l="CTR" v={tot.imp?gNum(tot.clk/tot.imp*100,2)+"%":"-"}/><Stat l="Avg. CPC" v={tot.clk?gNum(tot.cost/tot.clk,2):"-"}/><Stat l="Conversions" v={gNum(tot.conv,1)}/><Stat l="Cost / conv." v={tot.conv?gNum(tot.cost/tot.conv,2):"-"}/><Stat l="Conv. value" v={gNum(tot.val,2)}/>
+        </div>
+        <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Campaign","Status","Spend","Impr.","Clicks","CTR","Conv.","Cost/conv."].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
+          {camps.map((c,j)=><tr key={j}><td style={td}>{c.name}</td><td style={td}>{c.status}</td><td style={td}>{gNum(c.cost,2)}</td><td style={td}>{gNum(c.imp)}</td><td style={td}>{gNum(c.clk)}</td><td style={td}>{c.imp?gNum(c.clk/c.imp*100,2)+"%":"-"}</td><td style={td}>{gNum(c.conv,1)}</td><td style={td}>{c.conv?gNum(c.cost/c.conv,2):"-"}</td></tr>)}
+          {!camps.length&&<tr><td style={td} colSpan={8}>No campaign data in this period</td></tr>}</tbody></table></div>
+        {days.length>0&&<div style={{overflowX:"auto",marginTop:14}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Date","Spend","Impr.","Clicks","Conv."].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{days.map(dd=><tr key={dd}><td style={td}>{dd}</td><td style={td}>{gNum(byD[dd].cost,2)}</td><td style={td}>{gNum(byD[dd].imp)}</td><td style={td}>{gNum(byD[dd].clk)}</td><td style={td}>{gNum(byD[dd].conv,1)}</td></tr>)}</tbody></table></div>}
+      </div>}
+    </Card>);});
+  const gaView=()=>(data?.properties||[]).map((p,i)=>{
+    const rep=p.reports?.[tab];const ov=p.reports?.overview_by_day;
+    const sum=(name)=>{if(!ov?.rows?.length)return null;const ix=ov.metrics.indexOf(name);if(ix<0)return null;return ov.rows.reduce((s,r)=>s+(r.m[ix]||0),0);};
+    const S=(l,name,d=0)=>{const v=sum(name);return <Stat key={name} l={l} v={v===null?"-":gNum(v,d)}/>};
+    return(<Card key={i} s={{marginBottom:16}}>
+      <div style={{color:C.text,fontWeight:800,fontSize:15,marginBottom:10,direction:"ltr"}}>{p.property.display_name} <span style={{color:C.textS,fontSize:12,fontWeight:400}}>(property {p.property.property_id})</span></div>
+      <div style={{direction:"ltr"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>{S("Active users","activeUsers")}{S("New users","newUsers")}{S("Sessions","sessions")}{S("Engaged sessions","engagedSessions")}{S("Views","screenPageViews")}{S("Events","eventCount")}{S("Key events","keyEvents")}{S("Revenue","totalRevenue",2)}</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>{GA_TABS.map(([k,l])=><button key={k} onClick={()=>setTab(k)} style={{padding:"6px 12px",borderRadius:9,border:`1px solid ${tab===k?C.purple:C.border}`,background:tab===k?`${C.purple}33`:"transparent",color:tab===k?C.text:C.textS,fontSize:12,fontFamily:"Cairo",cursor:"pointer"}}>{l}</button>)}</div>
+        {rep?.error?<div style={{color:C.orange,fontSize:12}}>{rep.error}</div>:<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{[...(rep?.dims||[]),...(rep?.metrics||[])].map(h=><th key={h} style={th}>{gLabel(h)}</th>)}</tr></thead><tbody>
+          {(rep?.rows||[]).map((r,j)=><tr key={j}>{r.d.map((x,k)=><td key={"d"+k} style={td}>{x||"(not set)"}</td>)}{r.m.map((x,k)=><td key={"m"+k} style={td}>{gNum(x,Number.isInteger(x)?0:2)}</td>)}</tr>)}
+          {!(rep?.rows||[]).length&&<tr><td style={td}>No data in this period</td></tr>}</tbody></table></div>}
+      </div>
+    </Card>);});
+  return(
+    <div>
+      <TB title={isAds?"Google Ads 🔎":"Analytics 📈"} sub={isAds?"Read-only Google Ads numbers per client. Nothing here can change a campaign or a budget.":"Google Analytics (GA4) reports per client, read-only."}/>
+      <div className="wm-page" style={{padding:"0 32px 40px"}}>
+      {msg&&<div style={{color:C.orange,fontSize:12,marginBottom:10}}>{msg}</div>}
+      <Card s={{marginBottom:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",direction:"ltr"}}>
+          <span style={{color:C.text,fontSize:13}}>Google connection: {!conn?"not connected":conn.status==="active"?`connected as ${conn.email}`:`expired (${conn.email})`}</span>
+          <Btn onClick={connect}>{conn?"🔁 Reconnect Google":"🔗 Connect Google"}</Btn>
+          {conn?.status==="active"&&<Btn onClick={discover} disabled={busy}>🔄 Find accounts</Btn>}
+        </div>
+        {conn?.status==="expired"&&<div style={{color:C.orange,fontSize:12,marginTop:8,direction:"ltr"}}>Google asks to sign in again about every 7 days until the app is verified. Press Reconnect Google.</div>}
+        {conn&&items.length>0&&<div style={{marginTop:14,direction:"ltr"}}>
+          <div style={{color:C.textS,fontSize:12,marginBottom:6}}>{isAds?"Google Ads accounts":"Analytics properties"}: link each one to a client</div>
+          <div style={{maxHeight:260,overflowY:"auto"}}>{items.map(x=>{const id=isAds?x.customer_id:x.property_id;const nm=isAds?x.name:x.display_name;return(
+            <div key={id} style={{display:"flex",gap:10,alignItems:"center",padding:"6px 0",borderBottom:`1px solid ${C.border}22`,flexWrap:"wrap"}}>
+              <span style={{color:C.text,fontSize:12,minWidth:220}}>{nm||"(no name)"} <span style={{color:C.textS}}>{id}{isAds&&x.manager?" manager":""}{isAds&&x.status&&x.status!=="ENABLED"?" "+x.status.toLowerCase():""}</span></span>
+              <select value={x.client_id||""} onChange={e=>link(isAds?"ads":"ga",id,e.target.value)} style={{padding:"6px 10px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:9,color:C.text,fontSize:12,fontFamily:"Cairo",maxWidth:260}}>
+                <option value="">Not linked</option>{(clients||[]).filter(c=>c.status!=="cancelled").map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </select></div>);})}</div></div>}
+      </Card>
+      <Card s={{marginBottom:16}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12,direction:"ltr"}}>
+          <Sel label="Client" value={cid} onChange={setCid} opts={opts} ph="Select a client" mb={0}/>
+          <Inp label="From" value={from} onChange={setFrom} type="date" mb={0}/>
+          <Inp label="To" value={to} onChange={setTo} type="date" mb={0}/>
+        </div>
+        <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap",direction:"ltr"}}><Btn onClick={()=>preset(1)}>Yesterday</Btn><Btn onClick={()=>preset(7)}>Last 7 days</Btn><Btn onClick={()=>preset(30)}>Last 30 days</Btn></div>
+      </Card>
+      {busy&&cid&&<div style={{color:C.textS,fontSize:13}}>Loading...</div>}
+      {err&&<div style={{color:C.red||"#ff6b6b",fontSize:13,marginBottom:10}}>{err}</div>}
+      {data&&!(isAds?data.accounts:data.properties)?.length&&<div style={{color:C.textS,fontSize:13}}>{isAds?"No Google Ads account is linked to this client yet.":"No Analytics property is linked to this client yet."}</div>}
+      {data&&(isAds?adsView():gaView())}
+      </div>
+    </div>);
+}
+
 function DailyReport({clients,currentUser}){
   const isAdmin=currentUser?.role==="admin";
   const mine=(clients||[]).filter(c=>c.status!=="cancelled"&&(isAdmin||[c.mb,c.sm,c.am].includes(currentUser?.id)));
@@ -4140,6 +4241,8 @@ export default function App(){
       clients={clients} users={users} currentUser={user}
     />,
     "daily-report": <DailyReport clients={clients} currentUser={user}/>,
+    "google-ads": <GoogleReports kind="ads" clients={clients} currentUser={user}/>,
+    "analytics": <GoogleReports kind="ga" clients={clients} currentUser={user}/>,
     reports: <Reports clients={clients} campaigns={campaigns} users={users}/>,
     churn: <ChurnTracker clients={clients} users={users}/>,
     targets: <Targets clients={clients} campaigns={campaigns} users={users} targets={targets} setTargets={setTargets} isAdmin={user?.role==="admin"}/>,
