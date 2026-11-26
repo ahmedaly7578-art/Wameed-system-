@@ -1382,6 +1382,17 @@ function DailyReport({clients,currentUser}){
   const B=company?BRANDS[company]:null;
   const spanDays=Math.round((new Date(to)-new Date(from))/86400000)+1;
   const periodLabel=spanDays>=28?"Monthly report":spanDays>=6?"Weekly report":"Daily report";
+  const fetchPeriod=async()=>{
+    if(!data?.accounts?.length){setMsg("No Snapchat account is linked to this client");return;}
+    const days=Math.min(31,Math.max(1,Math.ceil((Date.now()-Date.parse(from))/86400000)+1));
+    let ok=0,bad=0;
+    for(let i=0;i<data.accounts.length;i++){
+      setMsg(`Fetching from Snapchat... account ${i+1} of ${data.accounts.length}`);
+      try{const r=await wmAuthFetch(`${SNAP_DAILY_URL}?mode=sync&accountId=${data.accounts[i].id}&days=${days}`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});if(r.ok)ok++;else bad++;}catch(e){bad++;}
+    }
+    setMsg(bad?`Fetched ${ok} account(s), ${bad} failed`:`Fetched ${ok} account(s). Snapchat only keeps recent days, up to 31 back.`);
+    load();
+  };
   const preset=(n)=>{setTo(iso(new Date(Date.now()-86400000)));setFrom(iso(new Date(Date.now()-n*86400000)));};
   const accounts=data?.accounts||[];
   const byCur={};
@@ -1449,7 +1460,7 @@ function DailyReport({clients,currentUser}){
             <option value="">Not set (neutral report)</option>{COMPANIES.map(o=><option key={o.v} value={o.v}>{o.v==="wameed"?"Wameed":o.v==="alfaisal"?"Al-Faisal":o.v==="imdad"?"Imdad":o.l}</option>)}
           </select>
         </div>}
-        <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap",direction:"ltr"}}><Btn onClick={()=>preset(1)}>Yesterday</Btn><Btn onClick={()=>preset(7)}>Last 7 days (weekly)</Btn><Btn onClick={()=>preset(30)}>Last 30 days (monthly)</Btn></div>
+        <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap",direction:"ltr"}}><Btn onClick={()=>preset(1)}>Yesterday</Btn><Btn onClick={()=>preset(7)}>Last 7 days (weekly)</Btn><Btn onClick={()=>preset(30)}>Last 30 days (monthly)</Btn>{isAdmin&&cid&&<Btn onClick={fetchPeriod}>⬇ Fetch this period from Snapchat</Btn>}</div>
       </Card>
       {busy&&<div style={{color:C.textS,fontSize:13}}>Loading...</div>}
       {err&&<div style={{color:C.red,fontSize:13}}>{err}</div>}
