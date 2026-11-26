@@ -3538,7 +3538,14 @@ const ls = {
 export default function App(){
   const [user, setUserRaw] = useState(() => ls.get("w_currentUser", null));
   const setUser = (u) => { setUserRaw(u); if(u) ls.set("w_currentUser", u); else ls.set("w_currentUser", null); };
-  const [page, setPage] = useState("dashboard");
+  const [page, setPageRaw] = useState("dashboard");
+  const setPage = (p) => { if (p !== page) { try { window.history.pushState({ wmPage: p }, ""); } catch (e) {} } setPageRaw(p); };
+  useEffect(() => {
+    try { window.history.replaceState({ wmPage: "dashboard" }, ""); } catch (e) {}
+    const h = (e) => { const st = e.state; if (st && st.wmPage) setPageRaw(st.wmPage); };
+    window.addEventListener("popstate", h);
+    return () => window.removeEventListener("popstate", h);
+  }, []);
   const [dbReady, setDbReady] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [metaSyncing, setMetaSyncing] = useState(false);
@@ -4088,7 +4095,10 @@ export default function App(){
           <span style={{fontSize:11,fontWeight:600,color:dbReady?C.green:C.orange}}>
             {dbReady ? "● متصل بـ Supabase" : "● محفوظ محلياً — يتزامن مع Supabase تلقائياً"}
           </span>
-          <NotifBell notifs={notifs} setNotifs={setNotifs} userId={user.id}/>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            {page!=="dashboard"&&<button onClick={()=>window.history.back()} style={{padding:"7px 14px",borderRadius:10,background:"rgba(255,255,255,0.06)",border:`1px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"Cairo"}}>← رجوع</button>}
+            <NotifBell notifs={notifs} setNotifs={setNotifs} userId={user.id}/>
+          </div>
         </div>
         {P[page] || P.dashboard}
       </main>
