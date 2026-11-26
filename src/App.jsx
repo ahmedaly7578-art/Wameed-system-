@@ -1013,6 +1013,39 @@ function AddClientModal({open,onClose,onAdd,users}){
   );
 }
 
+function ClientShots({client,currentUser}){
+  const [items,setItems]=useState([]);const [busy,setBusy]=useState(false);const [msg,setMsg]=useState("");const [urls,setUrls]=useState({});
+  const bucket=()=>window.__SB.storage.from("client-shots");
+  const load=async()=>{
+    const r=await bucket().list(client.id,{limit:200,sortBy:{column:"created_at",order:"desc"}});
+    if(r.error){setMsg("تعذر تحميل الصور");return;}
+    const files=(r.data||[]).filter(f=>f.name&&!f.name.startsWith("."));setItems(files);
+    if(files.length){const sg=await bucket().createSignedUrls(files.map(f=>client.id+"/"+f.name),3600);const m={};(sg.data||[]).forEach(x=>{if(x.signedUrl)m[x.path]=x.signedUrl;});setUrls(m);}
+  };
+  useEffect(()=>{load();},[client.id]);
+  const up=async(e)=>{
+    const fs=[...(e.target.files||[])];if(!fs.length)return;setBusy(true);setMsg("");
+    for(const f of fs){const ext=(f.name.split(".").pop()||"png").toLowerCase();const path=client.id+"/"+Date.now()+"-"+Math.random().toString(36).slice(2,7)+"."+ext;
+      const r=await bucket().upload(path,f,{contentType:f.type});if(r.error)setMsg("تعذر رفع "+f.name+": "+r.error.message);}
+    setBusy(false);e.target.value="";load();
+  };
+  const rm=async(f)=>{if(!window.confirm("حذف الصورة؟"))return;const r=await bucket().remove([client.id+"/"+f.name]);if(r.error)setMsg("تعذر الحذف");load();};
+  return(
+    <div>
+      <div style={{color:C.textS,fontSize:12,marginBottom:10}}>صور الإعلانات والنتائج الخاصة بهذا العميل فقط، مخزنة بشكل خاص (محدش بره الفريق المسؤول بيشوفها).</div>
+      <label style={{display:"inline-block",padding:"9px 16px",borderRadius:10,background:C.grad,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>{busy?"جاري الرفع...":"⬆️ رفع صور"}<input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={up} style={{display:"none"}} disabled={busy}/></label>
+      {msg&&<div style={{color:C.red,fontSize:12,marginTop:8}}>{msg}</div>}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:12,marginTop:14}}>
+        {items.map(f=>{const u=urls[client.id+"/"+f.name];return(
+          <div key={f.name} style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,overflow:"hidden"}}>
+            {u?<a href={u} target="_blank" rel="noreferrer"><img src={u} alt="" style={{width:"100%",height:130,objectFit:"cover",display:"block"}}/></a>:<div style={{height:130}}/>}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"6px 8px",fontSize:10,color:C.textS}}><span>{(f.created_at||"").slice(0,10)}</span><span onClick={()=>rm(f)} style={{cursor:"pointer",color:C.red}}>حذف</span></div>
+          </div>);})}
+        {!items.length&&<div style={{color:C.textS,fontSize:13}}>لا توجد صور بعد.</div>}
+      </div>
+    </div>);
+}
+
 function ClientDetail({currentUser,c,users,onBack,notes,setNotes,satisfaction,campaigns,setClients}){
   const [tab,setTab]=useState("overview");
   const [credOpen,setCredOpen]=useState(false);
@@ -1051,7 +1084,7 @@ function ClientDetail({currentUser,c,users,onBack,notes,setNotes,satisfaction,ca
       if(r.ok){setClients(p=>p.map(x=>x.id===c.id?{...x,company:v||null}:x));setCoBusy("تم الحفظ");}else setCoBusy("تعذر الحفظ");}catch(e){setCoBusy("تعذر الحفظ");}
     setTimeout(()=>setCoBusy(""),2500);
   };
-  const TABS=[["overview","عام"],["campaigns","الحملات"],["notes","السجل"],["portal","🔑 البوابة"],["renewal","الاشتراك"]];
+  const TABS=[["overview","عام"],["campaigns","الحملات"],["notes","السجل"],["shots","📸 الصور"],["portal","🔑 البوابة"],["renewal","الاشتراك"]];
 
   return(
     <div>
@@ -1203,6 +1236,8 @@ function ClientDetail({currentUser,c,users,onBack,notes,setNotes,satisfaction,ca
           <ClientNotes client={c} currentUser={currentUser} notes={notes||[]} setNotes={setNotes} users={users||[]} onBack={()=>setTab("overview")}/>
         )}
 
+        {tab==="shots"&&<ClientShots client={c} currentUser={currentUser}/>}
+
         {tab==="portal"&&(
           <div>
             <Card s={{marginBottom:14}}>
@@ -1332,6 +1367,39 @@ function DailyReport({clients,currentUser}){
       const a=document.createElement("a");a.download=`daily-report-${data?.client?.name||"client"}-${to}.png`;a.href=cv.toDataURL("image/png");a.click();setMsg("");
     }catch(e){setMsg("تعذر التصدير");}
   };
+  const exportPptx=async()=>{
+    if(!data)return;setMsg("جاري تجهيز العرض...");
+    try{
+      const {default:Pptx}=await import(/* @vite-ignore */ "https://esm.sh/pptxgenjs@3.12.0");
+      const pp=new Pptx();pp.layout="LAYOUT_WIDE";
+      const hex=(x,d)=>{const m=/#([0-9A-Fa-f]{6})/.exec(x||"");return m?m[1].toUpperCase():d;};
+      const Bk=data.client.company?BRANDS[data.client.company]:null;
+      const bg=hex(Bk?.bg,"1F2937"),ac=hex(Bk?.accent,"9CA3AF"),fg=hex(Bk?.fg,"F3F4F6");
+      const nm=data.client.name;const per=`${from} → ${to}`;
+      const s1=pp.addSlide();s1.background={color:bg};
+      if(Bk?.logo)s1.addImage({data:Bk.logo,x:0.6,y:0.5,w:2.2,h:1.4,sizing:{type:"contain",w:2.2,h:1.4}});
+      s1.addText(nm,{x:0.6,y:2.6,w:12,h:1,fontSize:40,bold:true,color:fg,rtlMode:true,align:"right"});
+      s1.addText(periodLabel+" · "+per,{x:0.6,y:3.7,w:12,h:0.6,fontSize:20,color:ac,align:"right",rtlMode:true});
+      Object.entries(byCur).forEach(([cur,rows])=>{
+        const sl=pp.addSlide();sl.background={color:bg};
+        sl.addText("إجمالي بعملة "+cur,{x:0.6,y:0.4,w:12,h:0.7,fontSize:26,bold:true,color:ac,align:"right",rtlMode:true});
+        metricsFor(rows).forEach(([l,v,d],i)=>{const x=0.6+(i%4)*3.1,y=1.5+Math.floor(i/4)*1.9;
+          sl.addShape(pp.ShapeType.roundRect,{x,y,w:2.9,h:1.6,fill:{color:ac,transparency:85},line:{color:ac,width:1}});
+          sl.addText(String(l),{x,y:y+0.1,w:2.9,h:0.5,fontSize:14,color:fg,align:"center",rtlMode:true});
+          sl.addText(fmtN(v,d),{x,y:y+0.7,w:2.9,h:0.7,fontSize:26,bold:true,color:fg,align:"center"});});
+      });
+      const rowsAll=allRows.slice().sort((x,y)=>x.stat_date<y.stat_date?1:-1).slice(0,14);
+      if(rowsAll.length){const sl=pp.addSlide();sl.background={color:bg};
+        sl.addText("تفاصيل الحملات (سناب)",{x:0.6,y:0.3,w:12,h:0.6,fontSize:22,bold:true,color:ac,align:"right",rtlMode:true});
+        const hd=["التاريخ","الحملة","الإنفاق","الظهور","السحبات","الحالة"].map(t=>({text:t,options:{bold:true,color:bg,fill:{color:ac}}}));
+        const body=rowsAll.map(r=>[r.stat_date,String(r.campaign_name||r.campaign_id||""),fmtN(num(r.metrics,"spend"),2),fmtN(num(r.metrics,"impressions")),fmtN(num(r.metrics,"swipes")),r.final?"نهائي":"أولي"].map(t=>({text:String(t),options:{color:fg}})));
+        sl.addTable([hd,...body],{x:0.6,y:1.1,w:12,fontSize:11,border:{type:"solid",color:ac,pt:0.5}});}
+      const sp=pp.addSlide();sp.background={color:bg};
+      sp.addText("حالة ربط المنصات",{x:0.6,y:0.4,w:12,h:0.7,fontSize:26,bold:true,color:ac,align:"right",rtlMode:true});
+      [["Snapchat",accounts.length?"متصل: أرقام حقيقية من سناب":"غير مربوط بحساب"],["Meta","غير متصل بالتقرير حاليًا"],["TikTok","غير متصل بالتقرير حاليًا"]].forEach(([a,b],i)=>sp.addText(a+": "+b,{x:0.6,y:1.5+i*0.9,w:12,h:0.7,fontSize:20,color:fg,align:"right",rtlMode:true}));
+      await pp.writeFile({fileName:`report-${nm}-${to}.pptx`});setMsg("");
+    }catch(e){setMsg("تعذر تصدير PowerPoint");}
+  };
   const company=data?.client?.company||null;
   const B=company?BRANDS[company]:null;
   const spanDays=Math.round((new Date(to)-new Date(from))/86400000)+1;
@@ -1415,7 +1483,11 @@ function DailyReport({clients,currentUser}){
               </div>
             </div>
           </div>
-          <div style={{marginTop:12}}><Btn onClick={exportPng}>⬇️ تصدير كصورة</Btn></div>
+          <div style={{marginTop:12,display:"flex",gap:8,flexWrap:"wrap"}}><Btn onClick={exportPng}>⬇️ تصدير كصورة</Btn><Btn onClick={exportPptx}>⬇️ تصدير PowerPoint</Btn></div>
+          <div style={{marginTop:14,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
+            {[["Meta","غير متصل بتقرير العميل حاليًا. الأرقام هتظهر هنا بعد ربط الحساب وتفعيل المزامنة."],["TikTok","غير متصل. لسه مفيش ربط فعلي، ومفيش أرقام معروضة."]].map(([n,t])=>(
+              <div key={n} style={{background:"rgba(255,255,255,0.03)",border:`1px dashed ${C.border}`,borderRadius:10,padding:"12px 14px"}}><div style={{color:C.text,fontWeight:800,fontSize:13}}>{n}</div><div style={{color:C.textS,fontSize:12,marginTop:4}}>{t}</div></div>))}
+          </div>
         </div>
       )}
     </div>
