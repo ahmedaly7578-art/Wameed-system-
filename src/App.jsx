@@ -875,28 +875,34 @@ function RenewalSystem({clients,users}){
 }
 
 // ═══ CLIENT NOTES ════════════════════════════════════════════════════════════
-function ClientNotes({client,notes,setNotes,users,onBack}){
+function ClientNotes({client,notes,setNotes,users,onBack,currentUser}){
   const [addOpen,setAddOpen]=useState(false);
+  const [nErr,setNErr]=useState("");
   const [f,setF]=useState({type:"note",title:"",content:""});
   const sf=(k,v)=>setF(p=>({...p,[k]:v}));
   const myNotes=notes.filter(n=>n.clientId===client.id).sort((a,b)=>b.date.localeCompare(a.date));
-  const typeIcon={note:"📝",call:"📞",deal:"🤝",meeting:"📅",issue:"⚠️"};
-  const typeColor={note:C.purple,call:C.blue,deal:C.green,meeting:C.teal,issue:C.red};
-  const add=()=>{
+  const typeIcon={note:"📝",call:"📞",deal:"🤝",meeting:"📅",issue:"⚠️",daily:"🗓️"};
+  const typeColor={note:C.purple,call:C.blue,deal:C.green,meeting:C.teal,issue:C.red,daily:C.orange};
+  const add=async()=>{
     if(!f.title.trim())return;
-    setNotes(p=>[...p,{id:Date.now(),clientId:client.id,userId:1,date:todayStr(),...f}]);
-    setF({type:"note",title:"",content:""});setAddOpen(false);
+    if(!window.__SB){setNErr("تعذر الحفظ");return;}
+    const row={client_id:client.id,user_id:currentUser?.id||null,type:f.type,title:f.title.trim(),content:f.content||"",date:todayStr()};
+    const {data,error}=await window.__SB.from("client_notes").insert(row).select("id").single();
+    if(error||!data){setNErr("تعذر الحفظ، حاول تاني");return;}
+    setNotes(p=>[...p,{id:data.id,clientId:client.id,userId:row.user_id,date:row.date,type:row.type,title:row.title,content:row.content}]);
+    setNErr("");setF({type:"note",title:"",content:""});setAddOpen(false);
   };
   return(
     <div>
       <Mdl open={addOpen} onClose={()=>setAddOpen(false)} title="📝 إضافة ملاحظة" width={460}>
-        <Sel label="النوع" value={f.type} onChange={v=>sf("type",v)} opts={[{v:"note",l:"📝 ملاحظة"},{v:"call",l:"📞 مكالمة"},{v:"deal",l:"🤝 صفقة"},{v:"meeting",l:"📅 اجتماع"},{v:"issue",l:"⚠️ مشكلة"}]}/>
+        <Sel label="النوع" value={f.type} onChange={v=>sf("type",v)} opts={[{v:"note",l:"📝 ملاحظة"},{v:"call",l:"📞 مكالمة"},{v:"deal",l:"🤝 صفقة"},{v:"meeting",l:"📅 اجتماع"},{v:"issue",l:"⚠️ مشكلة"},{v:"daily",l:"🗓️ تقرير الفريق اليومي"}]}/>
         <Inp label="العنوان" value={f.title} onChange={v=>sf("title",v)} placeholder="مثال: مكالمة تجديد" req/>
         <div style={{marginBottom:14}}>
           <label style={{display:"block",fontSize:12,fontWeight:600,color:C.textS,marginBottom:6}}>التفاصيل</label>
           <textarea value={f.content} onChange={e=>sf("content",e.target.value)} placeholder="اكتب التفاصيل..."
             style={{width:"100%",padding:"10px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,outline:"none",fontFamily:"Cairo",boxSizing:"border-box",resize:"vertical",minHeight:80,direction:"rtl"}}/>
         </div>
+        {nErr&&<div style={{color:C.red,fontSize:12,marginBottom:8}}>{nErr}</div>}
         <Btn onClick={add} style={{width:"100%",padding:13}}>✓ حفظ</Btn>
       </Mdl>
       <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",color:C.textS,cursor:"pointer",fontFamily:"Cairo",fontSize:13,marginBottom:14}}>← العودة</button>
@@ -1193,7 +1199,7 @@ function ClientDetail({currentUser,c,users,onBack,notes,setNotes,satisfaction,ca
         )}
 
         {tab==="notes"&&(
-          <ClientNotes client={c} notes={notes||[]} setNotes={setNotes} users={users||[]} onBack={()=>setTab("overview")}/>
+          <ClientNotes client={c} currentUser={currentUser} notes={notes||[]} setNotes={setNotes} users={users||[]} onBack={()=>setTab("overview")}/>
         )}
 
         {tab==="portal"&&(
@@ -3405,6 +3411,7 @@ export default function App(){
         return;
       }
       setLoadErr("");
+      try{const {data:dN}=await window.__SB.from("client_notes").select("id,client_id,user_id,type,title,content,date").order("date",{ascending:false}); if(dN) setNotes(dN.map(n=>({id:n.id,clientId:n.client_id,userId:n.user_id,type:n.type,title:n.title,content:n.content||"",date:String(n.date).slice(0,10)})));}catch(e){}
       if(dU?.length) {
         const v=dU.map(u=>({...u,avatar:u.avatar||ini(u.name),avatarUrl:u.avatar_url,isHeadOf:u.is_head_of}));
         // الأدمن الأساسي (IU[0]) لازم يفضل موجود دايمًا حتى لو قاعدة البيانات
