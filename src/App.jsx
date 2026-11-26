@@ -2389,7 +2389,7 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
           <select value={a.client_id||""} onChange={e=>onLinkAccount(a.id, e.target.value||null)}
             style={{padding:"8px 12px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none",minWidth:160}}>
             <option value="">— Select client —</option>
-            {clients.filter(c=>c.id===a.client_id||!linked.some(x=>x.client_id===c.id&&x.platform===a.platform)).map(c=>
+            {clients.map(c=>
               <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           {isAdmin && a.client_id && (
