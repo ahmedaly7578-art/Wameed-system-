@@ -1084,6 +1084,14 @@ function ClientDetail({currentUser,c,users,onBack,notes,setNotes,satisfaction,ca
       if(r.ok){setClients(p=>p.map(x=>x.id===c.id?{...x,company:v||null}:x));setCoBusy("تم الحفظ");}else setCoBusy("تعذر الحفظ");}catch(e){setCoBusy("تعذر الحفظ");}
     setTimeout(()=>setCoBusy(""),2500);
   };
+  const [asBusy,setAsBusy]=useState("");
+  const setAssign=async(k,col,v)=>{
+    setAsBusy("Saving...");
+    try{const r=await window.__SB.from("clients").update({[col]:v||null}).eq("id",c.id).select("id");
+      if(r.error||!r.data||!r.data.length){setAsBusy("Could not save");}
+      else{setClients(p=>p.map(x=>x.id===c.id?{...x,[k]:v||null,[col]:v||null}:x));setAsBusy("Saved");}}catch(e){setAsBusy("Could not save");}
+    setTimeout(()=>setAsBusy(""),2500);
+  };
   const TABS=[["overview","عام"],["campaigns","الحملات"],["notes","السجل"],["shots","📸 الصور"],["portal","🔑 البوابة"],["renewal","الاشتراك"]];
 
   return(
@@ -1121,6 +1129,15 @@ function ClientDetail({currentUser,c,users,onBack,notes,setNotes,satisfaction,ca
           : <span style={{color:C.text,fontSize:13}}>{(COMPANIES.find(o=>o.v===c.company)||{}).l||"لم تُحدد"}</span>}
         {coBusy&&<span style={{color:C.orange,fontSize:12}}>{coBusy}</span>}
       </div>
+      {currentUser?.role==="admin"&&<div style={{display:"flex",alignItems:"center",gap:14,marginBottom:14,flexWrap:"wrap",direction:"ltr"}}>
+        {[["mb","mb_id","Media Buyer","media_buyer"],["sm","sm_id","Social Media","social_media"],["am","am_id","Account Manager","account_manager"]].map(([k,col,lab,role])=>(
+          <label key={k} style={{display:"flex",alignItems:"center",gap:8,color:C.textS,fontSize:12}}>{lab}:
+            <select value={c[k]||""} onChange={e=>setAssign(k,col,e.target.value)} style={{padding:"7px 12px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:13,fontFamily:"Cairo"}}>
+              <option value="">Not assigned</option>
+              {(users||[]).filter(u=>u.role===role&&u.is_active!==false&&u.isActive!==false).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+            </select></label>))}
+        {asBusy&&<span style={{color:C.orange,fontSize:12}}>{asBusy}</span>}
+      </div>}
         <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",color:C.textS,cursor:"pointer",fontFamily:"Cairo",fontSize:13,marginBottom:14}}>← العملاء</button>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
           <div style={{display:"flex",alignItems:"center",gap:14}}>
