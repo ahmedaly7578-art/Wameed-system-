@@ -2644,7 +2644,7 @@ function TeamMgmt({users,setUsers}){
       if(edit){
         // Update existing
         setUsers(p=>p.map(u=>u.id===edit.id?{...u,...f,avatar:av}:u));
-        if(window.__SB) await window.__SB.from("users").update({name:f.name,role:f.role,avatar:av}).eq("id",edit.id);
+        if(window.__SB){const r=await window.__SB.from("users").update({name:f.name,role:f.role,avatar:av}).eq("id",edit.id).select("id");if(r.error||!r.data||!r.data.length){setErr("تعذر حفظ التعديل في قاعدة البيانات");setSaving(false);window.location.reload();return;}}
       }else{
         if(users.find(u=>u.email===f.email)){setErr("البريد مستخدم");setSaving(false);return;}
         // Create Supabase Auth login account (admin.createUser needs a service-role
@@ -2689,7 +2689,7 @@ function TeamMgmt({users,setUsers}){
                   <div style={{padding:"7px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:10}}><div style={{color:C.textM,fontSize:10,marginBottom:1}}>البريد</div><div style={{color:C.textS,fontSize:11,direction:"ltr",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div></div>
                   <div style={{display:"flex",gap:8}}>
                     <button onClick={()=>{setF({name:u.name,role:u.role,email:u.email,password:u.password});setErr("");setEdit(u);setOpen(true)}} style={{flex:1,padding:"7px",borderRadius:9,background:`${C.purple}18`,border:`1px solid ${C.purple}33`,color:C.purple,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>✏️ تعديل</button>
-                    <button onClick={()=>{if(window.confirm("حذف؟"))setUsers(p=>p.filter(x=>x.id!==u.id))}} style={{padding:"7px 11px",borderRadius:9,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>
+                    <button onClick={()=>{if(!window.confirm("حذف؟"))return;(async()=>{const r=await window.__SB.from("users").delete().eq("id",u.id).select("id");if(r.error||!r.data||!r.data.length){window.alert("تعذر الحذف: "+(r.error?(r.error.code==="23503"?"المستخدم مرتبط ببيانات (عملاء/سجلات). عطّله بدل الحذف.":r.error.message):"لا صلاحية"));return;}setUsers(p=>p.filter(x=>x.id!==u.id));})();}} style={{padding:"7px 11px",borderRadius:9,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>
                   </div>
                 </Card>
               ))}
@@ -3266,11 +3266,12 @@ const SB = typeof window !== "undefined" && window.__SB;
 const save = async (table, data) => {
   if(window.__SB) try { await window.__SB.from(table).insert(data); } catch(e) {}
 };
+const wmDbFail = (what, error) => { try { window.alert("تعذر "+what+" في قاعدة البيانات، لم يتم الحفظ: "+(error&&error.message||"")); } catch(e) {} setTimeout(()=>window.location.reload(),50); };
 const update = async (table, data, match) => {
-  if(window.__SB) try { await window.__SB.from(table).update(data).match(match); } catch(e) {}
+  if(window.__SB) try { const r = await window.__SB.from(table).update(data).match(match).select("id"); if(r.error) wmDbFail("حفظ التعديل", r.error); else if(!r.data||!r.data.length) wmDbFail("حفظ التعديل (لا صلاحية أو السجل غير موجود)", null); } catch(e) {}
 };
 const del = async (table, match) => {
-  if(window.__SB) try { await window.__SB.from(table).delete().match(match); } catch(e) {}
+  if(window.__SB) try { const r = await window.__SB.from(table).delete().match(match).select("id"); if(r.error) wmDbFail("الحذف", r.error); else if(!r.data||!r.data.length) wmDbFail("الحذف (لا صلاحية أو السجل غير موجود)", null); } catch(e) {}
 };
 const ls = {
   get: (k, def) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch(e) { return def; } },
