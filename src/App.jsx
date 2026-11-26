@@ -599,7 +599,7 @@ function ChurnTracker({clients,users}){
 }
 
 // ═══ TARGETS VS ACTUALS ════════════════════════════════════════════════════
-function Targets({clients,campaigns,users,targets,setTargets}){
+function Targets({clients,campaigns,users,targets,setTargets,isAdmin}){
   const mbs=users.filter(u=>u.role==="media_buyer");
   const [editOpen,setEditOpen]=useState(false);
   const [editUser,setEditUser]=useState(null);
@@ -638,9 +638,9 @@ function Targets({clients,campaigns,users,targets,setTargets}){
                   <Av text={m.avatar} img={m.avatarUrl} color={RC.media_buyer} size={46}/>
                   <div><div style={{color:C.text,fontSize:15,fontWeight:700}}>{m.name}</div><Bdg label="Media Buyer" color={RC.media_buyer}/></div>
                 </div>
-                <Btn onClick={()=>{setEditUser(m);const t=targets.find(x=>x.userId===m.id&&x.month==="2025-05");if(t)setF({targetClients:t.targetClients,targetRoas:t.targetRoas,targetUpsell:t.targetUpsell,targetRenewal:t.targetRenewal});setEditOpen(true)}} color={`${C.purple}33`} style={{color:C.purple,fontSize:12}}>✏️ تعديل الأهداف</Btn>
+                {isAdmin&&<Btn onClick={()=>{setEditUser(m);const t=targets.find(x=>x.userId===m.id&&x.month==="2025-05");if(t)setF({targetClients:t.targetClients,targetRoas:t.targetRoas,targetUpsell:t.targetUpsell,targetRenewal:t.targetRenewal});setEditOpen(true)}} color={`${C.purple}33`} style={{color:C.purple,fontSize:12}}>✏️ تعديل الأهداف</Btn>}
               </div>
-              {!target?<div style={{color:C.textM,fontSize:13,textAlign:"center",padding:"20px 0"}}>لم يتم تحديد أهداف — اضغط تعديل الأهداف</div>:(
+              {!target?<div style={{color:C.textM,fontSize:13,textAlign:"center",padding:"20px 0"}}>لم يتم تحديد أهداف</div>:(
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12}}>
                   {[["العملاء",actuals.clients,target.targetClients,clientPct,C.blue],["ROAS",actuals.roas,target.targetRoas,roasPct,C.green],["Upsell","—",target.targetUpsell,0,C.orange],["Renewal",`${Math.round(Math.random()*20+75)}%`,`${target.targetRenewal}%`,Math.round(Math.random()*30+70),C.purple]].map(([l,actual,tgt,p,co])=>(
                     <div key={l} style={{textAlign:"center",padding:"14px 10px",background:"rgba(255,255,255,0.03)",borderRadius:12}}>
@@ -1613,7 +1613,7 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
     <div>
       <AddClientModal open={addOpen} onClose={()=>setAddOpen(false)} onAdd={cl=>setClients(p=>[...p,cl])} users={users}/>
       <TB title="العملاء 👥" sub={`${clients.length} إجمالي · ${clients.filter(c=>c.status==="active").length} نشط · ${clients.filter(c=>c.email).length} لديهم بوابة`}>
-        <Btn onClick={()=>setAddOpen(true)}>+ إضافة عميل</Btn>
+        {currentUser?.role==="admin"&&<Btn onClick={()=>setAddOpen(true)}>+ إضافة عميل</Btn>}
       </TB>
       <div className="wm-page" style={{padding:"0 32px"}}>
         <div style={{display:"flex",gap:10,marginBottom:18,flexWrap:"wrap",alignItems:"center"}}>
@@ -1664,7 +1664,7 @@ function Clients({clients,setClients,users,notes,setNotes,satisfaction,campaigns
                               const newStatus=next[(cur+1)%next.length];
                               setClients(p=>p.map(x=>x.id===c.id?{...x,status:newStatus}:x));
                             }} style={{padding:"5px 10px",borderRadius:8,background:`${C.orange}18`,border:`1px solid ${C.orange}33`,color:C.orange,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}} title="تغيير الحالة">⟳</button>
-                            <button onClick={()=>{if(window.confirm(`هل تريد حذف "${c.name}"؟`))setClients(p=>p.filter(x=>x.id!==c.id));}} style={{padding:"5px 10px",borderRadius:8,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>
+                            {currentUser?.role==="admin"&&<button onClick={()=>{if(window.confirm(`هل تريد حذف "${c.name}"؟`))setClients(p=>p.filter(x=>x.id!==c.id));}} style={{padding:"5px 10px",borderRadius:8,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>}
                           </div>
                         </td>
                       </tr>
@@ -2455,6 +2455,54 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
   );
 }
 
+const ACTIVE_CAMPAIGNS_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/active-campaigns";
+function ActiveCampaignsTab({clients,currentUser}){
+  const [rows,setRows]=useState(null);const [err,setErr]=useState("");const [sp,setSp]=useState("all");const [sc,setSc]=useState("all");const [busy,setBusy]=useState("");
+  const isAdmin=currentUser?.role==="admin";
+  const load=async()=>{
+    try{
+      for(let i=0;i<60&&!window.__SB;i++)await new Promise(r=>setTimeout(r,100));
+      const r=await window.__SB.from("campaign_list").select("campaign_id,name,status,platform,spend_7d,currency,fetched_at,ad_account_id,ad_accounts(account_name,client_id,business_name)").order("spend_7d",{ascending:false,nullsFirst:false}).limit(3000);
+      if(r.error)throw r.error;setRows(r.data||[]);setErr("");
+    }catch(e){setErr("Could not load the campaigns");setRows([]);}
+  };
+  useEffect(()=>{load();},[]);
+  const refresh=async()=>{
+    setBusy("Fetching from Snapchat...");
+    try{for(const p of ["Snapchat","Meta"]){setBusy("Fetching from "+p+"...");const r=await wmAuthFetch(ACTIVE_CAMPAIGNS_URL+"?platform="+p,{method:"POST"});if(!r.ok)throw new Error("x");}setErr("");}catch(e){setErr("Refresh failed or timed out. Try again.");}
+    setBusy("");await load();
+  };
+  const cname=(id)=>(clients||[]).find(c=>String(c.id)===String(id))?.name||"No client";
+  const all=rows||[];
+  const shown=all.filter(r=>(sp==="all"||r.platform===sp)&&(sc==="all"||(sc==="none"?!r.ad_accounts?.client_id:String(r.ad_accounts?.client_id)===String(sc))));
+  const fetched=all.reduce((m,r)=>r.fetched_at&&(!m||r.fetched_at<m)?r.fetched_at:m,null);
+  const sel={padding:"9px 14px",background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:12,fontFamily:"Cairo",outline:"none"};
+  const clientIds=[...new Set(all.map(r=>r.ad_accounts?.client_id).filter(Boolean))];
+  return(
+    <div>
+      <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap",alignItems:"center",direction:"ltr"}}>
+        <select value={sp} onChange={e=>setSp(e.target.value)} style={sel}><option value="all">All platforms</option><option value="Snapchat">Snapchat</option><option value="Meta">Meta</option></select>
+        <select value={sc} onChange={e=>setSc(e.target.value)} style={sel}><option value="all">All clients</option><option value="none">No client</option>{clientIds.map(id=><option key={id} value={id}>{cname(id)}</option>)}</select>
+        <span style={{color:C.textS,fontSize:12}}>{shown.length} active campaigns</span>
+        {isAdmin&&<Btn onClick={refresh} disabled={!!busy}>{busy||"⟳ Refresh now"}</Btn>}
+      </div>
+      <div style={{color:C.textM,fontSize:11,marginBottom:12,direction:"ltr"}}>Only campaigns that are active on the platform. Spend is the last 7 days, in each account's own currency. Updated daily{fetched?` · oldest data: ${new Date(fetched).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})} (Cairo)`:""}.</div>
+      {err&&<div style={{color:C.red,fontSize:12,marginBottom:10}}>{err}</div>}
+      {rows===null?<Card s={{textAlign:"center",padding:"40px",color:C.textS}}>Loading...</Card>
+      :shown.length===0?<Card s={{textAlign:"center",padding:"40px",color:C.textS}}>No active campaigns found.</Card>
+      :<Card s={{padding:0,overflow:"hidden"}}><div style={{overflowX:"auto",direction:"ltr"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12,color:C.text}}>
+        <thead><tr style={{color:C.textM,textAlign:"left",fontSize:11}}>{["Platform","Campaign","Ad account","Client","Spend (7d)"].map(h=><th key={h} style={{padding:"12px 14px",borderBottom:`1px solid ${C.border}`,fontWeight:700}}>{h}</th>)}</tr></thead>
+        <tbody>{shown.map(r=>(<tr key={r.ad_account_id+r.campaign_id}>
+          <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`}}><PT name={r.platform}/></td>
+          <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,fontWeight:700}}>{r.name||r.campaign_id}</td>
+          <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,color:C.textS}}>{r.ad_accounts?.account_name||"—"}</td>
+          <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,color:r.ad_accounts?.client_id?C.text:C.textM}}>{r.ad_accounts?.client_id?cname(r.ad_accounts.client_id):"No client"}</td>
+          <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,color:C.orange,fontWeight:700}}>{r.spend_7d===null||r.spend_7d===undefined?"—":`${Number(r.spend_7d).toLocaleString("en-US",{maximumFractionDigits:2})} ${r.currency||""}`}</td>
+        </tr>))}</tbody></table></div></Card>}
+    </div>
+  );
+}
+
 function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=[],onLinkAccount,onConnectMeta,onConnectSnap,onSyncNow,onSyncRange,metaSyncing,tab,setTab}){
   const [addOpen,setAddOpen]=useState(false);
   const [sc,setSc]=useState("all");const [sp,setSp]=useState("all");
@@ -2469,15 +2517,16 @@ function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=
     <div>
       <AddCampaignModal open={addOpen} onClose={()=>setAddOpen(false)} onAdd={c=>setCampaigns(p=>[...p,c])} clients={clients} currentUser={currentUser}/>
       <TB title="Campaigns & Performance 📊" sub="Campaign numbers across all platforms">
-        {tab==="data" && <Btn onClick={()=>setAddOpen(true)}>+ Add campaign data</Btn>}
+        {tab==="data" && currentUser?.role==="admin" && <Btn onClick={()=>setAddOpen(true)}>+ Add campaign data</Btn>}
       </TB>
       <div className="wm-page" style={{padding:"0 32px"}}>
         <div style={{display:"flex",gap:8,marginBottom:20}}>
-          {[["data","📊 Campaigns"],["businesses","🔗 Businesses"]].map(([id,label])=>(
+          {[["active","🟢 Active campaigns"],["data","📊 Weekly data"],["businesses","🔗 Businesses"]].map(([id,label])=>(
             <button key={id} onClick={()=>setTab(id)} style={{padding:"9px 18px",borderRadius:10,background:tab===id?`${C.pink}18`:"transparent",border:tab===id?`1px solid ${C.pink}33`:`1px solid ${C.border}`,color:tab===id?C.pink:C.textS,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"Cairo"}}>{label}</button>
           ))}
         </div>
         {tab==="businesses" && <BusinessesTab adAccounts={adAccounts} clients={clients} onLinkAccount={onLinkAccount} onConnectMeta={onConnectMeta} onConnectSnap={onConnectSnap} onSyncNow={onSyncNow} onSyncRange={onSyncRange} metaSyncing={metaSyncing} isAdmin={currentUser?.role==="admin"}/>}
+        {tab==="active" && <ActiveCampaignsTab clients={clients} currentUser={currentUser}/>}
         {tab==="data" && <>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
           <StC label="Total spend" value={`${(filtered.reduce((s,c)=>s+c.spend,0)/1000).toFixed(0)}k SAR`} icon="💸" color={C.orange}/>
@@ -2496,7 +2545,7 @@ function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=
           </select>
         </div>
         {filtered.length===0
-          ?<Card s={{textAlign:"center",padding:"60px"}}><div style={{fontSize:40,marginBottom:12}}>📊</div><div style={{color:C.textS,fontSize:14,marginBottom:16}}>No campaigns yet. Add the first one.</div><Btn onClick={()=>setAddOpen(true)}>+ Add campaign data</Btn></Card>
+          ?<Card s={{textAlign:"center",padding:"60px"}}><div style={{fontSize:40,marginBottom:12}}>📊</div><div style={{color:C.textS,fontSize:14,marginBottom:16}}>No campaigns yet.{currentUser?.role==="admin"?" Add the first one.":""}</div>{currentUser?.role==="admin"&&<Btn onClick={()=>setAddOpen(true)}>+ Add campaign data</Btn>}</Card>
           :filtered.map(camp=>{
             const client=clients.find(c=>c.id===camp.clientId);
             return(<Card key={camp.id} s={{marginBottom:12}}>
@@ -2508,7 +2557,7 @@ function Campaigns({campaigns,setCampaigns,clients,users,currentUser,adAccounts=
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <span style={{color:(camp.roas||0)>=3?C.green:C.orange,fontSize:18,fontWeight:800}}>ROAS {camp.roas||"—"}</span>
-                  <button onClick={()=>setCampaigns(p=>p.filter(x=>x.id!==camp.id))} style={{padding:"4px 10px",borderRadius:7,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>
+                  {currentUser?.role==="admin"&&<button onClick={()=>setCampaigns(p=>p.filter(x=>x.id!==camp.id))} style={{padding:"4px 10px",borderRadius:7,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",color:C.red,fontSize:11,cursor:"pointer",fontFamily:"Cairo"}}>🗑</button>}
                 </div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8}}>
@@ -3493,7 +3542,7 @@ export default function App(){
   const [dbReady, setDbReady] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [metaSyncing, setMetaSyncing] = useState(false);
-  const [campaignsTab, setCampaignsTab] = useState("data");
+  const [campaignsTab, setCampaignsTab] = useState("active");
 
   // ─── STATE (localStorage as persistence) ──────────────────────────────────
   const [users, setUsersRaw] = useState(() => ls.get("w_users", IU));
@@ -3988,7 +4037,7 @@ export default function App(){
     "daily-report": <DailyReport clients={clients} currentUser={user}/>,
     reports: <Reports clients={clients} campaigns={campaigns} users={users}/>,
     churn: <ChurnTracker clients={clients} users={users}/>,
-    targets: <Targets clients={clients} campaigns={campaigns} users={users} targets={targets} setTargets={setTargets}/>,
+    targets: <Targets clients={clients} campaigns={campaigns} users={users} targets={targets} setTargets={setTargets} isAdmin={user?.role==="admin"}/>,
     scorecard: <Scorecard clients={clients} campaigns={campaigns} tasks={tasks} users={users}/>,
     satisfaction: <Satisfaction
       clients={clients} satisfaction={satisfaction}
