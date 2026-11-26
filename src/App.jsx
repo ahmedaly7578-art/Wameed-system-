@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { LOGOS } from "./brandLogos.js";
 
 const C={bg:"#070E1F",bgCard:"#0D1526",bgHover:"#111E35",bgModal:"#0A1220",border:"rgba(255,255,255,0.07)",borderH:"rgba(255,255,255,0.14)",text:"#F1F5FF",textS:"rgba(255,255,255,0.5)",textM:"rgba(255,255,255,0.25)",pink:"#E879A0",purple:"#7B6FE0",green:"#34D399",blue:"#60A5FA",orange:"#F59E0B",red:"#F87171",teal:"#2DD4BF",grad:"linear-gradient(135deg,#E879A0 0%,#7B6FE0 100%)"};
 const RC={admin:C.pink,media_buyer:C.purple,social_media:C.green,account_manager:C.blue,designer:C.teal};
@@ -1277,9 +1278,9 @@ const COMPANIES = [
 ];
 // Brand per company. Imdad has no approved assets yet: neutral draft on purpose.
 const BRANDS = {
-  wameed:{name:"وميض",en:"WAMEED",bg:"linear-gradient(135deg,#E879A0 0%,#7B6FE0 100%)",accent:"#FFFFFF",fg:"#FFFFFF"},
-  alfaisal:{name:"الفيصل",en:"AL-FAISAL",bg:"linear-gradient(135deg,#0B1437 0%,#2A2F7A 100%)",accent:"#D4AF37",fg:"#F5E6B3"},
-  imdad:{name:"إمداد",en:"IMDAD",bg:"linear-gradient(135deg,#374151 0%,#4B5563 100%)",accent:"#E5E7EB",fg:"#F3F4F6",draft:true},
+  wameed:{name:"وميض",en:"WAMEED",bg:"linear-gradient(135deg,#06122E 0%,#12306F 100%)",accent:"#22D3EE",fg:"#FFFFFF",logo:LOGOS.wameed},
+  alfaisal:{name:"الفيصل",en:"AL-FAISAL",bg:"linear-gradient(135deg,#0B1030 0%,#1A2050 100%)",accent:"#E3B85C",fg:"#F5E6B3",logo:LOGOS.alfaisal},
+  imdad:{name:"إمداد",en:"IMDAD",bg:"linear-gradient(135deg,#31954A 0%,#256F37 100%)",accent:"#FFFFFF",fg:"#FFFFFF",logo:LOGOS.imdad},
 };
 const fmtN=(v,d=0)=>v===null||v===undefined||!isFinite(v)?"—":Number(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
 const ratio=(a,b,k=1)=>(a===null||a===undefined||b===null||b===undefined||!(b>0))?null:a/b*k;
@@ -1333,6 +1334,9 @@ function DailyReport({clients,currentUser}){
   };
   const company=data?.client?.company||null;
   const B=company?BRANDS[company]:null;
+  const spanDays=Math.round((new Date(to)-new Date(from))/86400000)+1;
+  const periodLabel=spanDays>=28?"تقرير شهري":spanDays>=6?"تقرير أسبوعي":"تقرير يومي";
+  const preset=(n)=>{setTo(iso(new Date(Date.now()-86400000)));setFrom(iso(new Date(Date.now()-n*86400000)));};
   const accounts=data?.accounts||[];
   const byCur={};
   accounts.forEach(a=>{const cur=a.currency||"—";(byCur[cur]=byCur[cur]||[]).push(...a.rows.map(r=>({...r,cur})));});
@@ -1352,6 +1356,7 @@ function DailyReport({clients,currentUser}){
           <Inp label="من" value={from} onChange={setFrom} type="date" mb={0}/>
           <Inp label="إلى" value={to} onChange={setTo} type="date" mb={0}/>
         </div>
+        <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}><Btn onClick={()=>preset(1)}>أمس</Btn><Btn onClick={()=>preset(7)}>آخر 7 أيام (أسبوعي)</Btn><Btn onClick={()=>preset(30)}>آخر 30 يوم (شهري)</Btn></div>
       </Card>
       {busy&&<div style={{color:C.textS,fontSize:13}}>جاري التحميل...</div>}
       {err&&<div style={{color:C.red,fontSize:13}}>{err}</div>}
@@ -1359,13 +1364,16 @@ function DailyReport({clients,currentUser}){
         <div>
           <div ref={ref} style={{borderRadius:18,overflow:"hidden",border:`1px solid ${C.border}`,background:"#0D1526"}}>
             <div style={{background:B?B.bg:"#1F2937",padding:"20px 24px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div>
+              <div style={{display:"flex",alignItems:"center",gap:14}}>
+                {B?.logo&&<img src={B.logo} alt="" style={{height:54,width:"auto"}}/>}
+                <div>
                 <div style={{color:B?B.fg:"#F3F4F6",fontSize:22,fontWeight:900,}}>{B?B.name:"—"} <span style={{fontSize:12,letterSpacing:4,color:B?B.accent:"#9CA3AF",fontWeight:700}}>{B?B.en:"NO COMPANY SET"}</span></div>
                 {B?.draft&&<div style={{color:"#FDE68A",fontSize:11,marginTop:4}}>مسودة — هوية إمداد لسه مش معتمدة</div>}
                 {!B&&<div style={{color:"#FDE68A",fontSize:11,marginTop:4}}>الشركة لم تُحدد لهذا العميل — اختارها من صفحة العميل</div>}
+                </div>
               </div>
               <div style={{textAlign:"left"}}>
-                <div style={{color:B?B.fg:"#F3F4F6",fontSize:15,fontWeight:800}}>{data.client.name}</div>
+                <div style={{color:B?B.fg:"#F3F4F6",fontSize:15,fontWeight:800}}>{data.client.name} · {periodLabel}</div>
                 <div style={{color:B?B.accent:"#9CA3AF",fontSize:11,marginTop:2}}>{days.length?`من ${days[0]} إلى ${days[days.length-1]}`:`من ${from} إلى ${to}`}</div>
               </div>
             </div>
