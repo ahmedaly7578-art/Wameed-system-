@@ -945,8 +945,10 @@ function AddClientModal({open,onClose,onAdd,users}){
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const tp=(p)=>setF(prev=>({...prev,platforms:prev.platforms.includes(p)?prev.platforms.filter(x=>x!==p):[...prev.platforms,p]}));
   const sub=()=>{
-    if(!f.name.trim()||!f.pkg||!f.mb||!f.platforms.length||!f.start||!f.end){setErr("أكمل الحقول المطلوبة");return;}
-    onAdd({...f,id:Date.now(),pkg:+f.pkg,roas:+(f.roas||0),spend:+(f.spend||0),mb:+f.mb,sm:f.sm?+f.sm:null,am:f.am?+f.am:null});
+    if(!f.name.trim()){setErr("اكتب اسم العميل (في تبويب بيانات أساسية)");setStep(1);return;}
+    if(f.email.trim()&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())){setErr("البريد الإلكتروني غير صحيح");return;}
+    if(f.email.trim()&&!f.password){setErr("اكتب كلمة مرور للبوابة أو امسح البريد");return;}
+    onAdd({...f,email:f.email.trim(),id:Date.now(),pkg:+(f.pkg||0),roas:+(f.roas||0),spend:+(f.spend||0),mb:f.mb?+f.mb:null,sm:f.sm?+f.sm:null,am:f.am?+f.am:null,start:f.start||null,end:f.end||null});
     setF(E);setErr("");setStep(1);onClose();
   };
   const close=()=>{setF(E);setErr("");setStep(1);onClose();};
