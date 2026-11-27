@@ -2612,7 +2612,7 @@ function BusinessesTab({adAccounts,clients,onLinkAccount,onConnectMeta,onConnect
   const linked=adAccounts.filter(a=>a.client_id);
   const unlinked=adAccounts.filter(a=>!a.client_id);
   const linkedClientIds=new Set(linked.map(a=>a.client_id));
-  const platIcon=(p)=>p==="Meta"?"📘":p==="Snapchat"?"👻":"📊";
+  const platIcon=(p)=>p==="Meta"?"📘":p==="Snapchat"?"👻":p==="TikTok"?"🎵":"📊";
   const AccRow=({a})=>{
     const client=clients.find(c=>c.id===a.client_id);
     const statusColor=a.status==="connected"?C.green:a.status==="error"?C.red:a.status==="paused"?C.orange:C.textM;
@@ -2720,14 +2720,14 @@ function ActiveCampaignsTab({clients,currentUser}){
   return(
     <div>
       <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap",alignItems:"center",direction:"ltr"}}>
-        <select value={sp} onChange={e=>setSp(e.target.value)} style={sel}><option value="all">All platforms</option><option value="Snapchat">Snapchat</option><option value="Meta">Meta</option></select>
+        <select value={sp} onChange={e=>setSp(e.target.value)} style={sel}><option value="all">All platforms</option><option value="Snapchat">Snapchat</option><option value="Meta">Meta</option><option value="TikTok">TikTok</option></select>
         <select value={sc} onChange={e=>setSc(e.target.value)} style={sel}><option value="all">All clients</option><option value="none">No client</option>{clientIds.map(id=><option key={id} value={id}>{cname(id)}</option>)}</select>
         <span style={{color:C.textS,fontSize:12}}>{shown.length} active campaigns</span>
         {isAdmin&&<Btn onClick={refresh} disabled={!!busy}>{busy||"⟳ Refresh now"}</Btn>}
       </div>
       <div style={{color:C.textM,fontSize:11,marginBottom:12,direction:"ltr"}}>Only campaigns that are active on the platform. Spend is the last 7 days, in each account's own currency. Updated daily{fetched?` · oldest data: ${new Date(fetched).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})} (Cairo)`:""}.</div>
       {err&&<div style={{color:C.red,fontSize:12,marginBottom:10}}>{err}</div>}
-      {["Snapchat","Meta"].map(pl=>{const t=all.filter(r=>r.platform===pl).reduce((m,r)=>r.fetched_at&&(!m||r.fetched_at>m)?r.fetched_at:m,null);if(rows===null||!t||Date.now()-new Date(t).getTime()<36*3600*1000)return null;return <div key={pl} style={{padding:"10px 14px",marginBottom:10,borderRadius:10,background:`${C.orange}15`,border:`1px solid ${C.orange}40`,color:C.orange,fontSize:12,direction:"ltr"}}>⚠ {pl} data is out of date (last updated {new Date(t).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})} Cairo).{pl==="Meta"?" The Meta connection probably expired: reconnect it from the Businesses tab (Connect Meta account).":" Check the Snapchat connection in the Businesses tab."}</div>;})}
+      {["Snapchat","Meta","TikTok"].map(pl=>{const t=all.filter(r=>r.platform===pl).reduce((m,r)=>r.fetched_at&&(!m||r.fetched_at>m)?r.fetched_at:m,null);if(rows===null||!t||Date.now()-new Date(t).getTime()<36*3600*1000)return null;return <div key={pl} style={{padding:"10px 14px",marginBottom:10,borderRadius:10,background:`${C.orange}15`,border:`1px solid ${C.orange}40`,color:C.orange,fontSize:12,direction:"ltr"}}>⚠ {pl} data is out of date (last updated {new Date(t).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})} Cairo).{pl==="Meta"?" The Meta connection probably expired: reconnect it from the Businesses tab (Connect Meta account).":pl==="TikTok"?" TikTok numbers come from the daily email report: check that today's report email arrived.":" Check the Snapchat connection in the Businesses tab."}</div>;})}
       {rows===null?<Card s={{textAlign:"center",padding:"40px",color:C.textS}}>Loading...</Card>
       :shown.length===0?<Card s={{textAlign:"center",padding:"40px",color:C.textS}}>No active campaigns found.</Card>
       :<Card s={{padding:0,overflow:"hidden"}}><div style={{overflowX:"auto",direction:"ltr"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12,color:C.text}}>
