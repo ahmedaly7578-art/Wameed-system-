@@ -417,7 +417,6 @@ function Dashboard({clients,users,notifs,followups,tasks,currentUser}){
 }
 
 // ═══ AI ANALYSIS (Claude API) ════════════════════════════════════════════════
-const AI_URL="https://jokdohhukkbrergfauwc.supabase.co/functions/v1/ai-analysis";
 function AIAnalysis({clients,campaigns,users}){
   const [selClient,setSelClient]=useState("");
   const [aiResp,setAiResp]=useState("");
@@ -426,32 +425,36 @@ function AIAnalysis({clients,campaigns,users}){
   const [msg,setMsg]=useState("");
   const activeClients=clients.filter(c=>c.status==="active");
 
-  const aiCall=async(payload)=>{
-    const r=await wmAuthFetch(AI_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
-    const j=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(j.error||"تعذر الاتصال بخدمة التحليل");
-    return j;
-  };
   const analyze=async()=>{
     if(!selClient){alert("اختر عميلاً أولاً");return;}
+    const client=clients.find(c=>String(c.id)===String(selClient));
+    const cams=campaigns.filter(c=>String(c.clientId)===String(selClient));
+    const mb=users.find(u=>u.id===client.mb);
+    if(!cams.length){alert("لا توجد بيانات حملات لهذا العميل");return;}
     setLoading(true);
+    const summary=cams.map(c=>`${c.platform}: Spend ${c.spend} SAR, ROAS ${c.roas}, Clicks ${c.clicks}, Purchases ${c.purchases}, CTR ${c.ctr}%`).join("\n");
+    const prompt=`أنت مساعد تحليل حملات إعلانية لـ وميض (وكالة ميديا). حلل البيانات التالية لعميل "${client.name}" وأعطي:\n1. تشخيص الوضع الحالي\n2. المشاكل الرئيسية\n3. توصيات عملية بالأرقام\n4. توزيع الميزانية المقترح\n5. هدف ROAS الأسبوع القادم\n\nبيانات الحملات:\n${summary}\n\nميزانية العميل الشهرية: ${client.pkg} SAR\nالـ Media Buyer: ${mb?.name}\nالمنصات: ${client.platforms.join(", ")}\n\nرد بالعربي بشكل منظم ومختصر وعملي.`;
     try{
-      const j=await aiCall({clientId:selClient});
-      setAiResp(j.answer);
-      setChat([{role:"assistant",content:j.answer}]);
-    }catch(e){setAiResp(e.message||"حدث خطأ في الاتصال بـ AI. حاول مرة أخرى.");}
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
+      const data=await res.json();
+      const text=data.content?.[0]?.text||"لم يتمكن النظام من التحليل";
+      setAiResp(text);
+      setChat([{role:"assistant",content:text}]);
+    }catch(e){setAiResp("حدث خطأ في الاتصال بـ AI. حاول مرة أخرى.");}
     setLoading(false);
   };
 
   const sendMsg=async()=>{
-    if(!msg.trim()||loading||!selClient)return;
-    const q=msg.trim();
-    const newChat=[...chat,{role:"user",content:q}];
+    if(!msg.trim()||loading)return;
+    const client=clients.find(c=>String(c.id)===String(selClient));
+    const newChat=[...chat,{role:"user",content:msg}];
     setChat(newChat);setMsg("");setLoading(true);
     try{
-      const j=await aiCall({clientId:selClient,question:q,history:newChat.slice(0,-1).slice(-6)});
-      setChat(p=>[...p,{role:"assistant",content:j.answer}]);
-    }catch(e){setChat(p=>[...p,{role:"assistant",content:e.message||"حدث خطأ. حاول مرة أخرى."}]);}
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:600,system:`أنت مساعد تحليل حملات لوكالة وميض. العميل الحالي: ${client?.name}. رد بالعربي بشكل مختصر وعملي.`,messages:newChat.map(m=>({role:m.role,content:m.content}))})});
+      const data=await res.json();
+      const text=data.content?.[0]?.text||"خطأ في الاتصال";
+      setChat(p=>[...p,{role:"assistant",content:text}]);
+    }catch(e){setChat(p=>[...p,{role:"assistant",content:"حدث خطأ. حاول مرة أخرى."}]);}
     setLoading(false);
   };
 
@@ -461,7 +464,7 @@ function AIAnalysis({clients,campaigns,users}){
       <div className="wm-page" style={{padding:"0 32px"}}>
         <div style={{background:"rgba(123,111,224,0.08)",border:"1px solid rgba(123,111,224,0.25)",borderRadius:14,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:12}}>
           <span style={{fontSize:24}}>🤖</span>
-          <div><div style={{color:C.purple,fontSize:13,fontWeight:700,marginBottom:3}}>مدعوم بـ Gemini AI</div><div style={{color:"rgba(123,111,224,0.8)",fontSize:12}}>حدد عميلاً واضغط "تحليل الآن": الـ AI يقرأ أرقام الحملات الحقيقية من المنصات (آخر ٧ أيام واتجاه ١٤ يوم) ويرجع تحليلاً وتوصيات عملية. أسماء العملاء والحملات تُخفى قبل الإرسال، والتحليل استرشادي يساعد القرار ولا يغني عن حكم المختص.</div></div>
+          <div><div style={{color:C.purple,fontSize:13,fontWeight:700,marginBottom:3}}>مدعوم بـ Claude AI</div><div style={{color:"rgba(123,111,224,0.8)",fontSize:12}}>حدد عميلاً، واضغط "تحليل الآن" — الـ AI بيقرأ بيانات الحملات ويرجعلك تحليل كامل مع توصيات عملية</div></div>
         </div>
         <div className="wm-split-320" style={{display:"grid",gridTemplateColumns:"320px 1fr",gap:20}}>
           {/* Left: selector + info */}
@@ -470,8 +473,8 @@ function AIAnalysis({clients,campaigns,users}){
               <div style={{color:C.text,fontSize:14,fontWeight:700,marginBottom:14}}>اختر العميل</div>
               <Sel value={selClient} onChange={setSelClient} opts={activeClients.map(c=>({v:c.id,l:c.name}))} ph="اختر عميلاً..." mb={16}/>
               {selClient&&(()=>{
-                const client=clients.find(c=>c.id===+selClient);
-                const cams=campaigns.filter(c=>c.clientId===+selClient);
+                const client=clients.find(c=>String(c.id)===String(selClient));
+                const cams=campaigns.filter(c=>String(c.clientId)===String(selClient));
                 return(
                   <div>
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>{client.platforms.map(p=><PT key={p} name={p}/>)}</div>
@@ -492,7 +495,7 @@ function AIAnalysis({clients,campaigns,users}){
             {selClient&&(
               <Card s={{marginTop:14}}>
                 <div style={{color:C.text,fontSize:13,fontWeight:700,marginBottom:12}}>📊 ملخص الحملات</div>
-                {campaigns.filter(c=>c.clientId===+selClient).map(c=>(
+                {campaigns.filter(c=>String(c.clientId)===String(selClient)).map(c=>(
                   <div key={c.id} style={{padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><PT name={c.platform}/><span style={{color:c.roas>=3?C.green:C.orange,fontSize:12,fontWeight:700}}>ROAS {c.roas}</span></div>
                     <div style={{color:C.textM,fontSize:11}}>Spend: {c.spend.toLocaleString()} SAR · Purchases: {c.purchases}</div>
@@ -523,7 +526,7 @@ function AIAnalysis({clients,campaigns,users}){
                     <div key={i} style={{marginBottom:14}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                         <div style={{width:24,height:24,borderRadius:"50%",background:m.role==="assistant"?`${C.purple}33`:`${C.pink}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>{m.role==="assistant"?"🤖":"👤"}</div>
-                        <span style={{fontSize:11,color:C.textM,fontWeight:500}}>{m.role==="assistant"?"Gemini":"أنت"}</span>
+                        <span style={{fontSize:11,color:C.textM,fontWeight:500}}>{m.role==="assistant"?"Claude AI":"أنت"}</span>
                       </div>
                       <div style={{background:m.role==="assistant"?"rgba(123,111,224,0.08)":"rgba(255,255,255,0.04)",border:`1px solid ${m.role==="assistant"?"rgba(123,111,224,0.2)":C.border}`,borderRadius:12,padding:"12px 16px",fontSize:12.5,color:C.text,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{m.content}</div>
                     </div>
