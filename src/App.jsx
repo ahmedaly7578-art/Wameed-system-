@@ -417,6 +417,19 @@ function Dashboard({clients,users,notifs,followups,tasks,currentUser}){
 }
 
 // ═══ AI ANALYSIS (Claude API) ════════════════════════════════════════════════
+const mdRender=(t)=>{
+  const inline=(s2,k)=>s2.split(/(\*\*[^*]+\*\*)/g).map((p,i)=>p.startsWith("**")&&p.endsWith("**")?<b key={k+"b"+i} style={{fontWeight:700,color:C.text}}>{p.slice(2,-2)}</b>:<span key={k+"s"+i}>{p}</span>);
+  return t.split("\n").map((ln,i)=>{
+    const h=ln.match(/^(#{1,4})\s+(.*)/);
+    if(h)return <div key={i} style={{fontWeight:800,fontSize:h[1].length<=2?14:13,color:C.text,marginTop:i?10:2,marginBottom:4}}>{inline(h[2],i)}</div>;
+    const b=ln.match(/^\s*[*-]\s+(.*)/);
+    if(b)return <div key={i} style={{display:"flex",gap:6,marginBottom:2}}><span style={{color:C.purple}}>•</span><span style={{flex:1}}>{inline(b[1],i)}</span></div>;
+    const n=ln.match(/^\s*(\d+)[.)]\s+(.*)/);
+    if(n)return <div key={i} style={{display:"flex",gap:6,marginBottom:2}}><span style={{color:C.purple,fontWeight:700}}>{n[1]}.</span><span style={{flex:1}}>{inline(n[2],i)}</span></div>;
+    if(!ln.trim())return <div key={i} style={{height:6}}/>;
+    return <div key={i}>{inline(ln,i)}</div>;
+  });
+};
 const AI_URL="https://jokdohhukkbrergfauwc.supabase.co/functions/v1/ai-analysis";
 function AIAnalysis({clients,campaigns,users}){
   const [selClient,setSelClient]=useState("");
@@ -525,7 +538,7 @@ function AIAnalysis({clients,campaigns,users}){
                         <div style={{width:24,height:24,borderRadius:"50%",background:m.role==="assistant"?`${C.purple}33`:`${C.pink}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>{m.role==="assistant"?"🤖":"👤"}</div>
                         <span style={{fontSize:11,color:C.textM,fontWeight:500}}>{m.role==="assistant"?"Gemini":"أنت"}</span>
                       </div>
-                      <div style={{background:m.role==="assistant"?"rgba(123,111,224,0.08)":"rgba(255,255,255,0.04)",border:`1px solid ${m.role==="assistant"?"rgba(123,111,224,0.2)":C.border}`,borderRadius:12,padding:"12px 16px",fontSize:12.5,color:C.text,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{m.content}</div>
+                      <div style={{background:m.role==="assistant"?"rgba(123,111,224,0.08)":"rgba(255,255,255,0.04)",border:`1px solid ${m.role==="assistant"?"rgba(123,111,224,0.2)":C.border}`,borderRadius:12,padding:"12px 16px",fontSize:12.5,color:C.text,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{m.role==="assistant"?mdRender(m.content):m.content}</div>
                     </div>
                   ))}
                   {loading&&<div style={{color:C.textM,fontSize:12,textAlign:"center",padding:"10px 0"}}>🔄 جاري...</div>}
