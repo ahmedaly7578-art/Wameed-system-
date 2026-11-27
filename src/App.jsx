@@ -2701,7 +2701,7 @@ function ActiveCampaignsTab({clients,currentUser}){
   const load=async()=>{
     try{
       for(let i=0;i<60&&!window.__SB;i++)await new Promise(r=>setTimeout(r,100));
-      const r=await window.__SB.from("campaign_list").select("campaign_id,name,status,platform,spend_7d,currency,fetched_at,ad_account_id,ad_accounts(account_name,client_id,business_name)").order("spend_7d",{ascending:false,nullsFirst:false}).limit(3000);
+      const r=await window.__SB.from("campaign_list").select("campaign_id,name,status,platform,spend_7d,impressions_7d,clicks_7d,conversions_7d,currency,fetched_at,ad_account_id,ad_accounts(account_name,client_id,business_name)").order("spend_7d",{ascending:false,nullsFirst:false}).limit(3000);
       if(r.error)throw r.error;setRows(r.data||[]);setErr("");
     }catch(e){setErr("Could not load the campaigns");setRows([]);}
   };
@@ -2725,19 +2725,24 @@ function ActiveCampaignsTab({clients,currentUser}){
         <span style={{color:C.textS,fontSize:12}}>{shown.length} active campaigns</span>
         {isAdmin&&<Btn onClick={refresh} disabled={!!busy}>{busy||"⟳ Refresh now"}</Btn>}
       </div>
-      <div style={{color:C.textM,fontSize:11,marginBottom:12,direction:"ltr"}}>Only campaigns that are active on the platform. Spend is the last 7 days, in each account's own currency. Updated daily{fetched?` · oldest data: ${new Date(fetched).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})} (Cairo)`:""}.</div>
+      <div style={{color:C.textM,fontSize:11,marginBottom:12,direction:"ltr"}}>Only campaigns that are active on the platform. All numbers are the last 7 days, in each account's own currency. TikTok updates hourly, other platforms daily{fetched?` · oldest data: ${new Date(fetched).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})} (Cairo)`:""}.</div>
       {err&&<div style={{color:C.red,fontSize:12,marginBottom:10}}>{err}</div>}
-      {["Snapchat","Meta","TikTok"].map(pl=>{const t=all.filter(r=>r.platform===pl).reduce((m,r)=>r.fetched_at&&(!m||r.fetched_at>m)?r.fetched_at:m,null);if(rows===null||!t||Date.now()-new Date(t).getTime()<36*3600*1000)return null;return <div key={pl} style={{padding:"10px 14px",marginBottom:10,borderRadius:10,background:`${C.orange}15`,border:`1px solid ${C.orange}40`,color:C.orange,fontSize:12,direction:"ltr"}}>⚠ {pl} data is out of date (last updated {new Date(t).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})} Cairo).{pl==="Meta"?" The Meta connection probably expired: reconnect it from the Businesses tab (Connect Meta account).":pl==="TikTok"?" TikTok numbers come from the daily email report: check that today's report email arrived.":" Check the Snapchat connection in the Businesses tab."}</div>;})}
+      {["Snapchat","Meta","TikTok"].map(pl=>{const t=all.filter(r=>r.platform===pl).reduce((m,r)=>r.fetched_at&&(!m||r.fetched_at>m)?r.fetched_at:m,null);if(rows===null||!t||Date.now()-new Date(t).getTime()<36*3600*1000)return null;return <div key={pl} style={{padding:"10px 14px",marginBottom:10,borderRadius:10,background:`${C.orange}15`,border:`1px solid ${C.orange}40`,color:C.orange,fontSize:12,direction:"ltr"}}>⚠ {pl} data is out of date (last updated {new Date(t).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})} Cairo).{pl==="Meta"?" The Meta connection probably expired: reconnect it from the Businesses tab (Connect Meta account).":pl==="TikTok"?" TikTok numbers come from the hourly Ads Manager pull.":" Check the Snapchat connection in the Businesses tab."}</div>;})}
       {rows===null?<Card s={{textAlign:"center",padding:"40px",color:C.textS}}>Loading...</Card>
       :shown.length===0?<Card s={{textAlign:"center",padding:"40px",color:C.textS}}>No active campaigns found.</Card>
       :<Card s={{padding:0,overflow:"hidden"}}><div style={{overflowX:"auto",direction:"ltr"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12,color:C.text}}>
-        <thead><tr style={{color:C.textM,textAlign:"left",fontSize:11}}>{["Platform","Campaign","Ad account","Client","Spend (7d)"].map(h=><th key={h} style={{padding:"12px 14px",borderBottom:`1px solid ${C.border}`,fontWeight:700}}>{h}</th>)}</tr></thead>
+        <thead><tr style={{color:C.textM,textAlign:"left",fontSize:11}}>{["Platform","Campaign","Ad account","Client","Spend (7d)","Impr. (7d)","Clicks (7d)","CTR","Conv. (7d)","Cost/conv"].map(h=><th key={h} style={{padding:"12px 14px",borderBottom:`1px solid ${C.border}`,fontWeight:700}}>{h}</th>)}</tr></thead>
         <tbody>{shown.map(r=>(<tr key={r.ad_account_id+r.campaign_id}>
           <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`}}><PT name={r.platform}/></td>
           <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,fontWeight:700}}>{r.name||r.campaign_id}</td>
           <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,color:C.textS}}>{r.ad_accounts?.account_name||"—"}</td>
           <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,color:r.ad_accounts?.client_id?C.text:C.textM}}>{r.ad_accounts?.client_id?cname(r.ad_accounts.client_id):"No client"}</td>
           <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,color:C.orange,fontWeight:700}}>{r.spend_7d===null||r.spend_7d===undefined?"—":`${Number(r.spend_7d).toLocaleString("en-US",{maximumFractionDigits:2})} ${r.currency||""}`}</td>
+          <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,color:C.text}}>{r.impressions_7d===null||r.impressions_7d===undefined?"—":Number(r.impressions_7d).toLocaleString("en-US")}</td>
+          <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,color:C.text}}>{r.clicks_7d===null||r.clicks_7d===undefined?"—":Number(r.clicks_7d).toLocaleString("en-US")}</td>
+          <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,color:C.text}}>{r.impressions_7d>0&&r.clicks_7d!=null?`${(r.clicks_7d/r.impressions_7d*100).toFixed(2)}%`:"—"}</td>
+          <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,color:C.text}}>{r.conversions_7d===null||r.conversions_7d===undefined?"—":Number(r.conversions_7d).toLocaleString("en-US")}</td>
+          <td style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,color:C.text}}>{r.conversions_7d>0&&r.spend_7d!=null?`${(r.spend_7d/r.conversions_7d).toLocaleString("en-US",{maximumFractionDigits:2})} ${r.currency||""}`:"—"}</td>
         </tr>))}</tbody></table></div></Card>}
     </div>
   );
