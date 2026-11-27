@@ -1404,6 +1404,7 @@ function ClientDetail({currentUser,c,users,clients,onBack,notes,setNotes,satisfa
 
 // ─── Daily client report (Snapchat) ──────────────────────────────────────────
 const SNAP_DAILY_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/snap-daily";
+const TIKTOK_URL = "https://jokdohhukkbrergfauwc.supabase.co/functions/v1/tiktok-reports";
 const COMPANIES = [
   {v:"wameed",l:"وميض Wameed"},
   {v:"imdad",l:"إمداد Imdad"},
@@ -1549,15 +1550,17 @@ function DailyReport({clients,currentUser}){
   const [cid,setCid]=useState("");
   const [from,setFrom]=useState(iso(new Date(Date.now()-3*86400000)));
   const [to,setTo]=useState(iso(new Date(Date.now()-86400000)));
-  const [data,setData]=useState(null);const [err,setErr]=useState("");const [busy,setBusy]=useState(false);
+  const [data,setData]=useState(null);const [tdata,setTdata]=useState(null);const [err,setErr]=useState("");const [busy,setBusy]=useState(false);
   const [msg,setMsg]=useState("");
   const ref=useRef(null);
   const load=async()=>{
-    if(!cid)return;setBusy(true);setErr("");setData(null);
+    if(!cid)return;setBusy(true);setErr("");setData(null);setTdata(null);
     try{
+      const trP=wmAuthFetch(`${TIKTOK_URL}?mode=report&clientId=${cid}&from=${from}&to=${to}`).then(async r=>r.ok?await r.json():null).catch(()=>null);
       const r=await wmAuthFetch(`${SNAP_DAILY_URL}?mode=report&clientId=${cid}&from=${from}&to=${to}`);
       const j=await r.json();
       if(!r.ok)setErr(r.status===403?"You do not have access to this client":"Could not load the report");else setData(j);
+      setTdata(await trP);
     }catch(e){setErr("Could not load the report");}
     setBusy(false);
   };
@@ -1613,6 +1616,14 @@ function DailyReport({clients,currentUser}){
   const campaignsFor=(rows)=>{const m={};rows.forEach(r=>{const k=r.campaign_id||r.campaign_name;(m[k]=m[k]||{name:r.campaign_name||r.campaign_id,rows:[]}).rows.push(r);});
     return Object.values(m).map(c=>({name:c.name,days:new Set(c.rows.map(r=>r.stat_date)).size,m:metricGroups(c.rows).flatMap(g=>g.items).reduce((o,i)=>(o[i.l]=i,o),{})})).sort((a,b)=>(b.m["Spend"].v||0)-(a.m["Spend"].v||0));};
   const cell=(i,d)=>i?fmtN(i.v,i.d)+(i.v!==null&&i.suf?i.suf:""):"—";
+  const tAccounts=tdata?.accounts||[];
+  const tByCur={};
+  tAccounts.forEach(a=>{const c=a.currency||"Unknown currency";(tByCur[c]=tByCur[c]||[]).push(...a.rows);});
+  const tAgg=(rows)=>{const m=k=>rows.reduce((t,r)=>t+(num(r.metrics,k)||0),0);const sp=m("spend"),im=m("impressions"),cl=m("clicks"),pu=m("conversion_purchases"),pv=m("conversion_purchases_value");
+    return [["Spend",sp,2],["Impressions",im],["Clicks",cl],["CTR",im>0?cl/im*100:null,2,"%"],["Purchases",pu],["Revenue",pv,2],["ROAS",sp>0?pv/sp:null,2],["Cost / purchase",pu>0?sp/pu:null,2]];};
+  const tCampaigns=(rows)=>{const m={};rows.forEach(r=>{const k=r.campaign_id||r.campaign_name;(m[k]=m[k]||{name:r.campaign_name||r.campaign_id,rows:[]}).rows.push(r);});
+    return Object.values(m).map(c=>({name:c.name,days:new Set(c.rows.map(r=>r.stat_date)).size,rows:c.rows})).sort((a,b)=>tAgg(b.rows)[0][1]-tAgg(a.rows)[0][1]);};
+  const tCell=(v,d,suf)=>v===null||v===undefined?"—":fmtN(v,d)+(suf||"");
   const exportPptx=async()=>{
     if(!data)return;setMsg("Preparing PowerPoint...");
     try{
@@ -1645,7 +1656,7 @@ function DailyReport({clients,currentUser}){
       });
       const sp=pp.addSlide();sp.background={color:bg};
       sp.addText("Platform connection status",{x:0.6,y:0.4,w:12,h:0.7,fontSize:26,bold:true,color:ac});
-      [["Snapchat",accounts.length?"Connected: real numbers from Snapchat":"No account linked"],["Meta","Not connected to reports yet"],["TikTok","Not connected to reports yet"]].forEach(([a,b],i)=>sp.addText(a+": "+b,{x:0.6,y:1.5+i*0.9,w:12,h:0.7,fontSize:20,color:fg}));
+      [["Snapchat",accounts.length?"Connected: real numbers from Snapchat":"No account linked"],["Meta","Not connected to reports yet"],["TikTok",tAccounts.length?"Connected: numbers from TikTok Ads Manager email reports":"No account linked"]].forEach(([a,b],i)=>sp.addText(a+": "+b,{x:0.6,y:1.5+i*0.9,w:12,h:0.7,fontSize:20,color:fg}));
       await pp.writeFile({fileName:`report-${nm}-${to}.pptx`});setMsg("");
     }catch(e){setMsg("PowerPoint export failed");}
   };
@@ -1653,7 +1664,7 @@ function DailyReport({clients,currentUser}){
   const td={padding:"8px 10px",textAlign:"left",fontSize:12,whiteSpace:"nowrap",borderBottom:"1px solid rgba(255,255,255,0.04)"};
   return(
     <div>
-      <TB title="Client Reports 🗓️" sub="Daily Snapchat numbers per client, refreshed automatically at 8:30 AM Cairo time. Use the period buttons for weekly and monthly views."/>
+      <TB title="Client Reports 🗓️" sub="Daily Snapchat and TikTok numbers per client. Snapchat refreshes automatically at 8:30 AM Cairo time; TikTok arrives from TikTok Ads Manager's scheduled email report. Use the period buttons for weekly and monthly views."/>
       <div className="wm-page" style={{padding:"0 32px 40px"}}>
       {isAdmin&&<div style={{marginBottom:12}}><button onClick={refresh} style={{padding:"8px 14px",background:`${C.purple}22`,border:`1px solid ${C.purple}44`,borderRadius:10,color:C.purple,fontFamily:"Cairo",fontSize:12,cursor:"pointer"}}>🔄 Refresh accounts from Snapchat</button></div>}
       {msg&&<div style={{color:C.orange,fontSize:12,marginBottom:10}}>{msg}</div>}
@@ -1742,9 +1753,57 @@ function DailyReport({clients,currentUser}){
               </div>
             </div>
           </div>
+          {tAccounts.length>0&&(
+          <div style={{marginTop:16,borderRadius:16,overflow:"hidden",border:`1px solid ${C.border}`,background:C.bgCard,direction:"ltr",textAlign:"left"}}>
+            <div style={{background:"#111827",padding:"18px 26px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+              <div style={{color:"#F3F4F6",fontSize:20,fontWeight:900}}>TikTok</div>
+              <div style={{color:"#9CA3AF",fontSize:12}}>{from} to {to} · source: TikTok Ads Manager daily email report</div>
+            </div>
+            <div style={{padding:"20px 26px"}}>
+              {Object.entries(tByCur).map(([cur,rows])=>{const tcs=tCampaigns(rows);return(
+                <div key={cur} style={{marginBottom:26}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}><div style={{color:C.text,fontSize:15,fontWeight:800}}>Totals in {cur}</div><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:"rgba(255,255,255,0.07)",color:C.textS}}>{tcs.length} campaigns</span></div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
+                    {tAgg(rows).map(([l,v,d,suf])=>(
+                      <div key={l} style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px"}}>
+                        <div style={{color:C.textS,fontSize:11}}>{l}</div>
+                        <div style={{color:C.text,fontSize:18,fontWeight:800,marginTop:2}}>{tCell(v,d,suf)}</div>
+                      </div>))}
+                  </div>
+                  {tcs.length>0&&<div style={{marginTop:16}}>
+                    <div style={{color:C.textS,fontSize:11,letterSpacing:1.5,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>By campaign (period total)</div>
+                    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}>
+                      <thead><tr>{["Campaign","Days","Spend","Impressions","Clicks","CTR","Purchases","Revenue","ROAS","Cost / purchase"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+                      <tbody>{tcs.map((c,i)=>{const a=tAgg(c.rows);return <tr key={i} style={{color:C.text}}>
+                        <td style={{...td,maxWidth:260,overflow:"hidden",textOverflow:"ellipsis"}}>{c.name}</td><td style={td}>{c.days}</td>
+                        {a.map(([l,v,d,suf])=><td key={l} style={td}>{tCell(v,d,suf)}</td>)}
+                      </tr>;})}</tbody>
+                    </table></div>
+                  </div>}
+                </div>);})}
+              {tAccounts.filter(a=>a.rows.length).map(a=>(
+                <div key={a.id} style={{marginBottom:16}}>
+                  <div style={{color:C.textS,fontSize:11,letterSpacing:1.5,textTransform:"uppercase",fontWeight:700,marginBottom:6}}>Daily detail: {a.name} ({a.currency||"unknown currency"})</div>
+                  <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead><tr>{["Date","Campaign","Spend","Impressions","Clicks","CTR","Purchases","Revenue","ROAS"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+                    <tbody>{a.rows.slice().sort((x,y)=>x.stat_date<y.stat_date?1:-1).map((r,i)=>{
+                      const sp=num(r.metrics,"spend"),im=num(r.metrics,"impressions"),cl=num(r.metrics,"clicks"),pu=num(r.metrics,"conversion_purchases"),pv=num(r.metrics,"conversion_purchases_value");
+                      return <tr key={i} style={{color:C.text}}>
+                        <td style={td}>{r.stat_date}</td><td style={{...td,maxWidth:240,overflow:"hidden",textOverflow:"ellipsis"}}>{r.campaign_name||r.campaign_id}</td>
+                        <td style={td}>{fmtN(sp,2)}</td><td style={td}>{fmtN(im)}</td><td style={td}>{fmtN(cl)}</td><td style={td}>{ratio(cl,im,100)===null?"—":fmtN(ratio(cl,im,100),2)+"%"}</td>
+                        <td style={td}>{fmtN(pu)}</td><td style={td}>{fmtN(pv,2)}</td><td style={td}>{fmtN(ratio(pv,sp),2)}</td></tr>;})}</tbody>
+                  </table></div>
+                </div>
+              ))}
+              <div style={{color:"rgba(255,255,255,0.7)",fontSize:12,lineHeight:1.8,marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+                Numbers come from TikTok Ads Manager's scheduled daily email report and are updated when the email arrives.{tdata?.fetched?` Last updated: ${new Date(tdata.fetched).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})} (Cairo time).`:""}
+              </div>
+            </div>
+          </div>
+          )}
           <div style={{marginTop:12,display:"flex",gap:8,flexWrap:"wrap",direction:"ltr"}}><Btn onClick={exportPng}>⬇️ Export image</Btn><Btn onClick={exportPptx}>⬇️ Export PowerPoint</Btn></div>
           <div style={{marginTop:14,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10,direction:"ltr",textAlign:"left"}}>
-            {[["Meta","Not connected to client reports yet. Numbers will appear here once the account is linked and syncing."],["TikTok","Not connected. No live integration yet, so no numbers are shown."]].map(([n,t])=>(
+            {[["Meta","Not connected to client reports yet. Numbers will appear here once the account is linked and syncing."],...(tAccounts.length?[]:[["TikTok","No TikTok ad account is linked to this client yet. Once linked, numbers from TikTok Ads Manager's daily email report appear above."]])].map(([n,t])=>(
               <div key={n} style={{background:"rgba(255,255,255,0.03)",border:`1px dashed ${C.border}`,borderRadius:10,padding:"12px 14px"}}><div style={{color:C.text,fontWeight:800,fontSize:13}}>{n}</div><div style={{color:C.textS,fontSize:12,marginTop:4}}>{t}</div></div>))}
           </div>
         </div>
@@ -3872,7 +3931,7 @@ export default function App(){
         window.__SB.from("tasks").select("*"),
         window.__SB.from("satisfaction").select("*"),
         window.__SB.from("payroll").select("*"),
-        window.__SB.from("ad_accounts").select("id,account_id,account_name,business_name,platform,client_id,status,is_active,last_synced_at").in("platform",["Meta","Snapchat"]).order("account_name"),
+        window.__SB.from("ad_accounts").select("id,account_id,account_name,business_name,platform,client_id,status,is_active,last_synced_at").in("platform",["Meta","Snapchat","TikTok"]).order("account_name"),
       ]);
       const dUm=new Map((dDir||[]).map(r=>[r.id,r]));(dU0||[]).forEach(r=>dUm.set(r.id,{...dUm.get(r.id),...r}));
       const dU=[...dUm.values()];
@@ -4170,7 +4229,7 @@ export default function App(){
           if(res.error){ alert("حصل خطأ في المزامنة: "+res.error); return; }
           const [{data:dCa},{data:dAA}] = await Promise.all([
             window.__SB.from("campaigns").select("*").order("week_start",{ascending:false}),
-            window.__SB.from("ad_accounts").select("id,account_id,account_name,business_name,platform,client_id,status,is_active,last_synced_at").in("platform",["Meta","Snapchat"]).order("account_name"),
+            window.__SB.from("ad_accounts").select("id,account_id,account_name,business_name,platform,client_id,status,is_active,last_synced_at").in("platform",["Meta","Snapchat","TikTok"]).order("account_name"),
           ]);
           if(dCa){ const v=dCa.map(c=>({...c,clientId:c.client_id,week:c.week_start,purchaseValue:c.purchase_value})); setCampaignsRaw(v); ls.set("w_campaigns",v); }
           setAdAccountsRaw(dAA||[]); ls.set("w_adAccounts", dAA||[]);
@@ -4188,7 +4247,7 @@ export default function App(){
           if(res.error){ alert("حصل خطأ في الاستيراد: "+res.error); return; }
           const [{data:dCa},{data:dAA}] = await Promise.all([
             window.__SB.from("campaigns").select("*").order("week_start",{ascending:false}),
-            window.__SB.from("ad_accounts").select("id,account_id,account_name,business_name,platform,client_id,status,is_active,last_synced_at").in("platform",["Meta","Snapchat"]).order("account_name"),
+            window.__SB.from("ad_accounts").select("id,account_id,account_name,business_name,platform,client_id,status,is_active,last_synced_at").in("platform",["Meta","Snapchat","TikTok"]).order("account_name"),
           ]);
           if(dCa){ const v=dCa.map(c=>({...c,clientId:c.client_id,week:c.week_start,purchaseValue:c.purchase_value})); setCampaignsRaw(v); ls.set("w_campaigns",v); }
           setAdAccountsRaw(dAA||[]); ls.set("w_adAccounts", dAA||[]);
