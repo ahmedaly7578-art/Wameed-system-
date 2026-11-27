@@ -439,7 +439,7 @@ function AIAnalysis({clients,campaigns,users}){
       const j=await aiCall({clientId:selClient});
       setAiResp(j.answer);
       setChat([{role:"assistant",content:j.answer}]);
-    }catch(e){setAiResp(e.message||"حدث خطأ في الاتصال بـ AI. حاول مرة أخرى.");}
+    }catch(e){const m2=e.message||"حدث خطأ في الاتصال بـ AI. حاول مرة أخرى.";setAiResp(m2);setChat([{role:"assistant",content:m2}]);}
     setLoading(false);
   };
 
